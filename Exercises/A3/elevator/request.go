@@ -57,48 +57,13 @@ func (e *Elevator) request_here() bool {
 	return false
 }
 
-func (e *Elevator) choose_direction() {
-	switch e.direction {
-	case elevio.MD_Up:
-		if e.request_above() {
-			e.direction = elevio.MD_Up
-		} else if e.request_below() {
-			e.direction = elevio.MD_Down
-		} else {
-			e.direction = elevio.MD_Stop
-		}
-	
-	case elevio.MD_Down:
-		if e.request_below() {
-			e.direction = elevio.MD_Down
-		} else if e.request_above() {
-			e.direction = elevio.MD_Up
-		} else {
-			e.direction = elevio.MD_Stop
-		}
-
-	case elevio.MD_Stop:
-		if e.request_above() {
-			e.direction = elevio.MD_Up
-		} else if e.request_below() {
-			e.direction = elevio.MD_Down
-		} else {
-			e.direction = elevio.MD_Stop
-		}
-	}
-}
-
 func (e *Elevator) should_stop() bool {
 	switch e.direction {
 	case elevio.MD_Down:
-		return e.requests[e.current_floor][elevio.BT_HallDown] || 
-			   e.requests[e.current_floor][elevio.BT_Cab] || 
-			   !e.request_below()
+		return e.requests[e.current_floor][elevio.BT_HallDown] || e.requests[e.current_floor][elevio.BT_Cab] || !e.request_below()
 
 	case elevio.MD_Up:
-		return e.requests[e.current_floor][elevio.BT_HallUp] || 
-			   e.requests[e.current_floor][elevio.BT_Cab] || 
-			   !e.request_above()
+		return e.requests[e.current_floor][elevio.BT_HallUp] || e.requests[e.current_floor][elevio.BT_Cab] || !e.request_above()
 	
 	default:
 		return false
@@ -114,24 +79,13 @@ func (e *Elevator) should_clear() bool {
 
 func (e *Elevator) clear_at_current_floor() {
 	e.requests[e.current_floor][elevio.BT_Cab] = false
-	switch e.direction {
-	case elevio.MD_Up:
-		if (!e.request_above() && !e.requests[e.current_floor][elevio.BT_HallUp]) {
-			e.requests[e.current_floor][elevio.BT_HallDown] = false
-		}
-		e.requests[e.current_floor][elevio.BT_HallUp] = false
-		break
-		
-	case elevio.MD_Down:
-		if (!e.request_below() && !e.requests[e.current_floor][elevio.BT_HallDown]) {
-			e.requests[e.current_floor][elevio.BT_HallUp] = false
-		}
-		e.requests[e.current_floor][elevio.BT_HallDown] = false
-		break
 	
-	default:
+	if (e.request_above() && (e.requests[e.current_floor][elevio.BT_HallUp] && e.requests[e.current_floor][elevio.BT_HallDown])) {
+		e.requests[e.current_floor][elevio.BT_HallUp] = false
+	} else if (e.request_below() && (e.requests[e.current_floor][elevio.BT_HallUp] && e.requests[e.current_floor][elevio.BT_HallDown])) {
+		e.requests[e.current_floor][elevio.BT_HallDown] = false
+	} else {
 		e.requests[e.current_floor][elevio.BT_HallUp] = false
 		e.requests[e.current_floor][elevio.BT_HallDown] = false
-		break
 	}
 }
