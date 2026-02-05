@@ -6,4 +6,5 @@ use (
     ./elevator
 	./network
 	./master
+	./utilities
 )

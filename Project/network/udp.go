@@ -27,7 +27,7 @@ func broadcast() {
 	}
 }
 
-func discover_server() (string, error) {
+func Discover_server() (string, error) {
 	addr, err := net.ResolveUDPAddr("udp", config.UDP_port)
 	if err != nil {
 		return "", err

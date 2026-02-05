@@ -7,7 +7,7 @@ import (
 // Elevator
 const N_floors = 4
 const N_buttons = 3
-const Door_open_duration = 3 * time.Second
+const Open_duration = 3 * time.Second
 
 // Network
 const UDP_port = ":60000"
@@ -16,4 +16,10 @@ const Broadcast_delay = 1 * time.Second
 const Search_timeout = 5 * time.Second
 const Dialer_timeout = 5 * time.Second
 const Inactivity_timeout = 10 * time.Second
-const Heart_beat_delay = 5 * time.Second
+const Heartbeat_delay = 5 * time.Second
+const Reconnect_delay = 5 * time.Second
+
+// Master
+const N_elevators = 3
+const Busy_penalty = 5
+const Request_timeout = N_floors * 2 * time.Second

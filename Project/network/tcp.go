@@ -2,27 +2,13 @@ package network
 
 import (
 	"bufio"
-	"elevio"
 	"config"
+	"encoding/json"
 	"log"
 	"net"
 	"strings"
 	"time"
-	"encoding/json"
 )
-
-type DataPayload struct {
-	ID           string                 `json:"id,omitempty"`
-	CurrentFloor int                    `json:"current_floor,omitempty"`
-	Obstruction  bool					`json:"obstruction,omitempty"`
-	OrderFloor   int                    `json:"order_floor,omitempty"`
-	OrderButton  elevio.ButtonType      `json:"order_button,omitempty"`
-}
-
-type Message struct {
-	Header  string      			`json:"header"`
-	Payload *DataPayload			`json:"payload,omitempty"`
-}
 
 type Client struct {
     Conn   *net.TCPConn
@@ -32,7 +18,6 @@ type Client struct {
 	Stop   chan struct{}
 }
 
-// TODO: Change to send client instead of conn for new connections and disconnections
 func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<- Message) {
 	go broadcast()
 
@@ -55,14 +40,14 @@ func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<
 			continue
 		}
 
-		client := new_client(conn)
+		client := New_client(conn)
 		newChan<- client
 		go client.Listen(msgChan, lossChan)
 		go client.Heart_beat()
 	}
 }
 
-func new_client(conn *net.TCPConn) *Client {
+func New_client(conn *net.TCPConn) *Client {
     return &Client{
         Conn:   conn,
         Reader: bufio.NewReader(conn),
@@ -73,7 +58,7 @@ func new_client(conn *net.TCPConn) *Client {
 }
 
 func (c *Client) Listen(msgChan chan<- Message, lossChan chan<- *Client) {
-	defer c.disconnect(lossChan)
+	defer c.terminate(lossChan)
 
 	for {
 		c.Conn.SetReadDeadline(time.Now().Add(config.Inactivity_timeout))
@@ -90,19 +75,18 @@ func (c *Client) Listen(msgChan chan<- Message, lossChan chan<- *Client) {
 			continue
 		}
 
-		log.Printf("Received from: %s ", c.Addr)
+		message.Address = c.Addr
 		msgChan<- message
 	}
 }
 
-func (c *Client) disconnect(lossChan chan<- *Client) {
+func (c *Client) terminate(lossChan chan<- *Client) {
 	lossChan<- c
 	c.Conn.Close()
 	close(c.Stop)
-	//log.Printf("Client %s disconnected.", c.Addr)
 }
 
-func (c *Client) Send(header string, data *DataPayload) {
+func (c *Client) Send(header HeaderType, data *DataPayload) {
 	message, _ := json.Marshal(Message{Header: header, Payload: data})
 
 	_, err := c.Writer.WriteString(string(message) + "\n")
@@ -114,25 +98,25 @@ func (c *Client) Send(header string, data *DataPayload) {
 }
 
 func (c *Client) Heart_beat() {
-	ticker := time.NewTicker(config.Heart_beat_delay)
+	ticker := time.NewTicker(config.Heartbeat_delay)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <- ticker.C:
-			c.Send("Beat", nil)
+			c.Send(Heartbeat, nil)
 		case <- c.Stop:
 			return
 		}
 	}
 }
 
-func Connect(server_addr string) (net.Conn, error) {
+func Connect(server_addr string) (*net.TCPConn, error) {
 	dialer := net.Dialer{Timeout: config.Dialer_timeout}
 
 	conn, err := dialer.Dial("tcp", server_addr)
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+	return conn.(*net.TCPConn), nil
 }
