@@ -3,15 +3,22 @@ package network
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
-func Send_udp(msg string, ip string, port int) {
+const tag = "[UDP]: "
 
+func Send_udp(msg string, ip string, port int) {
 	address, err := net.ResolveUDPAddr("udp", ip+":"+fmt.Sprint(port))
+
+	if err != nil {
+		fmt.Println(tag+"Error: ", err)
+	}
+
 	conn, err := net.Dial("udp", address.String())
 
 	if err != nil {
-		fmt.Printf("Error: ", err)
+		fmt.Println(tag+"Error: ", err)
 	}
 
 	defer conn.Close()
@@ -20,31 +27,28 @@ func Send_udp(msg string, ip string, port int) {
 	conn.Write(data)
 }
 
-func Receive_udp(port int) (<-chan []byte, error) {
+func Receive_udp(conn *net.UDPConn, timeout time.Duration) ([]byte, error) {
 
-	ch := make(chan []byte)
+	buffer := make([]byte, 1024)
 
-	address, err := net.ResolveUDPAddr("udp", fmt.Sprint(port))
-	conn, err := net.ListenUDP("udp", address)
+	conn.SetDeadline(time.Now().Add(timeout))
+
+	n, _, err := conn.ReadFromUDP(buffer)
 	if err != nil {
-		fmt.Println("Error during the UDP initialization: ", err)
+		fmt.Println(tag+"Error during the UDP receiving: ", err)
 		return nil, err
 	}
 
-	go func() {
-		defer conn.Close()
+	return buffer[:n], nil
+}
 
-		buffer := make([]byte, 1024)
+func Connect_UDP(port int, ip string) *net.UDPConn {
+	address, err := net.ResolveUDPAddr("udp", fmt.Sprintf(ip+":%d", port))
+	conn, err := net.ListenUDP("udp", address)
+	if err != nil {
+		fmt.Println(tag+"Error during the UDP initialization: ", err)
+		return nil
+	}
 
-		for {
-			n, _, err := conn.ReadFromUDP(buffer)
-			if err != nil {
-				fmt.Println("Error during the UDP receiving: ", err)
-			}
-			data := make([]byte, n)
-			copy(data, buffer[n:])
-			ch <- data
-		}
-	}()
-	return ch, nil
+	return conn
 }
