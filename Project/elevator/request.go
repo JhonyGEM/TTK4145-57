@@ -62,7 +62,7 @@ func (e *Elevator) should_stop() bool {
 
 	case elevio.MD_Up:
 		return e.Requests[e.Current_floor][elevio.BT_HallUp] || e.Requests[e.Current_floor][elevio.BT_Cab] || !e.request_above()
-	
+
 	default:
 		return false
 	}
@@ -70,9 +70,9 @@ func (e *Elevator) should_stop() bool {
 
 func (e *Elevator) should_clear() bool {
 	return ((e.Direction == elevio.MD_Up && e.Requests[e.Current_floor][elevio.BT_HallUp]) ||
-		    (e.Direction == elevio.MD_Down && e.Requests[e.Current_floor][elevio.BT_HallDown]) ||
-		    (e.Direction == elevio.MD_Stop) ||
-		    (e.Requests[e.Current_floor][elevio.BT_Cab]))
+		(e.Direction == elevio.MD_Down && e.Requests[e.Current_floor][elevio.BT_HallDown]) ||
+		(e.Direction == elevio.MD_Stop) ||
+		(e.Requests[e.Current_floor][elevio.BT_Cab]))
 }
 
 func (e *Elevator) clear_at_current_floor() {
@@ -80,13 +80,13 @@ func (e *Elevator) clear_at_current_floor() {
 	if e.Connected {
 		e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_Cab}})
 	}
-	
-	if (e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
+
+	if e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown]) {
 		e.Requests[e.Current_floor][elevio.BT_HallUp] = false
 		if e.Connected {
 			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
 		}
-	} else if (e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
+	} else if e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown]) {
 		e.Requests[e.Current_floor][elevio.BT_HallDown] = false
 		if e.Connected {
 			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})

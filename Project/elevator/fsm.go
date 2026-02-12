@@ -19,8 +19,8 @@ func (e *Elevator) Step_FSM() {
 		}
 
 	case Idle:
-		if (e.pending_request()) {
-			if (e.request_here()) {
+		if e.pending_request() {
+			if e.request_here() {
 				e.clear_at_current_floor()
 				e.Update_lights(e.Requests)
 				e.Door_timer.Reset(config.Open_duration)
@@ -31,13 +31,13 @@ func (e *Elevator) Step_FSM() {
 		}
 
 	case Moving:
-		if (e.should_stop() && elevio.GetFloor() != -1) {
+		if e.should_stop() && elevio.GetFloor() != -1 {
 			e.update_direction(elevio.MD_Stop)
 			if e.should_clear() {
 				e.clear_at_current_floor()
 				e.Update_lights(e.Requests)
 			}
-			e.Door_timer.Reset(config.Open_duration)	
+			e.Door_timer.Reset(config.Open_duration)
 			e.Update_state(Door_open)
 		} else {
 			e.choose_direction()
@@ -47,7 +47,7 @@ func (e *Elevator) Step_FSM() {
 	case Door_open:
 		elevio.SetDoorOpenLamp(true)
 
-		if (e.Obstruction) {
+		if e.Obstruction {
 			e.Door_timer.Reset(config.Open_duration)
 		} else {
 			if e.Door_timer_done {

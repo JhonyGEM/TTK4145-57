@@ -10,21 +10,21 @@ import (
 )
 
 type Master struct {
-	Client_list 	     map[string]*Elevator_client // key is addr
-	Hall_requests        [][]bool
-	Hall_assignments     [][]string
-	Cab_requests         []map[string]bool
-	Successor_addr       string
-	Pending              map[string]*network.Message
+	Client_list      map[string]*Elevator_client // key is addr
+	Hall_requests    [][]bool
+	Hall_assignments [][]string
+	Cab_requests     []map[string]bool
+	Successor_addr   string
+	Pending          map[string]*network.Message
 }
 
 type Elevator_client struct {
-	Connection 		*network.Client
-	ID 				string
-	Current_floor 	int
-	Obstruction 	bool
-	Busy 			bool
-	Task_timer 		*time.Timer
+	Connection    *network.Client
+	ID            string
+	Current_floor int
+	Obstruction   bool
+	Busy          bool
+	Task_timer    *time.Timer
 }
 
 // TODO: Problems
@@ -34,14 +34,11 @@ type Elevator_client struct {
 // 3. Test if everyting thats implemented works
 // 4. Streamline btn light handling
 
-
 // Communication redundancy
 // each event (new reques) need an unique id
 // when elevator recieves request it will send it to master and save it pending array until it gets ack, it will be resedn if no ack in certain time window
 // master will recive the message, handle the event, send copy to sucsessor and wait for ack before sending ack to elevator
 //      the pending array will be of type message and will be keyed by event id (time at the event was send + id of client)
-
-
 
 func Create_cab_requests(floor int) []map[string]bool {
 	cab_requests := make([]map[string]bool, floor)
@@ -61,7 +58,7 @@ func create_hall_assignments(floors, buttons int) [][]string {
 
 func New_master() *Master {
 	return &Master{
-		Client_list :     make(map[string]*Elevator_client),
+		Client_list:      make(map[string]*Elevator_client),
 		Hall_requests:    utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Hall_assignments: create_hall_assignments(config.N_floors, config.N_buttons),
 		Cab_requests:     Create_cab_requests(config.N_floors),
@@ -144,7 +141,7 @@ func (m *Master) Still_busy(addr string) bool {
 	for f := 0; f < config.N_floors; f++ {
 		if m.Cab_requests[f][m.Client_list[addr].ID] {
 			return false
-		}	
+		}
 	}
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
@@ -163,10 +160,10 @@ func (m *Master) Client_timer_handler(timeout chan<- *network.Client) {
 				select {
 				case <-client.Task_timer.C:
 					client.Task_timer.Stop()
-					timeout<- client.Connection
+					timeout <- client.Connection
 
 				default:
-				
+
 				}
 			}
 			time.Sleep(500 * time.Millisecond)

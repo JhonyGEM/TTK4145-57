@@ -2,14 +2,14 @@ package network
 
 import (
 	"config"
-	"net"
-	"time"
 	"fmt"
 	"log"
+	"net"
+	"time"
 )
 
 func broadcast() {
-	addr, err := net.ResolveUDPAddr("udp", "255.255.255.255" + config.UDP_port)
+	addr, err := net.ResolveUDPAddr("udp", "255.255.255.255"+config.UDP_port)
 	if err != nil {
 		log.Fatalf("Failed to resolve address: %v", err)
 	}
@@ -49,5 +49,5 @@ func Discover_server() (string, error) {
 	}
 	log.Printf("Received broadcast from %s: %s\n", addr.IP, string(buffer[:n]))
 
-	return fmt.Sprintf("%s" + config.TCP_port, addr.IP), nil
+	return fmt.Sprintf("%s"+config.TCP_port, addr.IP), nil
 }

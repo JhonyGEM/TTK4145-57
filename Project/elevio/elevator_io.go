@@ -1,18 +1,18 @@
 package elevio
 
-import "time"
-import "sync"
-import "net"
-import "fmt"
-
-
+import (
+	"fmt"
+	"net"
+	"sync"
+	"time"
+)
 
 const _pollRate = 20 * time.Millisecond
 
-var _initialized    bool = false
-var _numFloors      int = 4
-var _mtx            sync.Mutex
-var _conn           net.Conn
+var _initialized bool = false
+var _numFloors int = 4
+var _mtx sync.Mutex
+var _conn net.Conn
 
 type MotorDirection int
 
@@ -35,8 +35,6 @@ type ButtonEvent struct {
 	Button ButtonType
 }
 
-
-
 func Init(addr string, numFloors int) {
 	if _initialized {
 		fmt.Println("Driver already initialized!")
@@ -51,8 +49,6 @@ func Init(addr string, numFloors int) {
 	}
 	_initialized = true
 }
-
-
 
 func SetMotorDirection(dir MotorDirection) {
 	write([4]byte{1, byte(dir), 0, 0})
@@ -149,7 +145,7 @@ func PollObstructionSwitch(receiver chan<- bool, quitChan <-chan struct{}) {
 		select {
 		case <-quitChan:
 			return
-			
+
 		case <-ticker.C:
 			v := GetObstruction()
 			if v != prev {
@@ -159,9 +155,6 @@ func PollObstructionSwitch(receiver chan<- bool, quitChan <-chan struct{}) {
 		}
 	}
 }
-
-
-
 
 func GetButton(button ButtonType, floor int) bool {
 	a := read([4]byte{6, byte(button), byte(floor), 0})
@@ -187,32 +180,33 @@ func GetObstruction() bool {
 	return toBool(a[1])
 }
 
-
-
-
-
 func read(in [4]byte) [4]byte {
 	_mtx.Lock()
 	defer _mtx.Unlock()
-	
+
 	_, err := _conn.Write(in[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
-	
+	if err != nil {
+		panic("Lost connection to Elevator Server")
+	}
+
 	var out [4]byte
 	_, err = _conn.Read(out[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
-	
+	if err != nil {
+		panic("Lost connection to Elevator Server")
+	}
+
 	return out
 }
 
 func write(in [4]byte) {
 	_mtx.Lock()
 	defer _mtx.Unlock()
-	
-	_, err := _conn.Write(in[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
-}
 
+	_, err := _conn.Write(in[:])
+	if err != nil {
+		panic("Lost connection to Elevator Server")
+	}
+}
 
 func toByte(a bool) byte {
 	var b byte = 0

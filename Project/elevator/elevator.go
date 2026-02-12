@@ -3,12 +3,12 @@ package elevator
 import (
 	"config"
 	"elevio"
+	"encoding/json"
+	"log"
 	"network"
+	"os"
 	"time"
 	"utilities"
-	"encoding/json"
-	"os"
-	"log"
 )
 
 type state int
@@ -21,18 +21,18 @@ const (
 )
 
 type Elevator struct {
-	Current_state   state
-	Current_floor   int
-	Direction       elevio.MotorDirection
-	Obstruction     bool
-	Requests        [][]bool
-	Id              string
-	Succesor        bool
+	Current_state state
+	Current_floor int
+	Direction     elevio.MotorDirection
+	Obstruction   bool
+	Requests      [][]bool
+	Id            string
+	Succesor      bool
 	//Network
-	Connection      *network.Client
-	Connected       bool
-	Retry_counter   int
-	Pending         map[string]*network.Message
+	Connection    *network.Client
+	Connected     bool
+	Retry_counter int
+	Pending       map[string]*network.Message
 	//Timers
 	Door_timer      *time.Timer
 	Door_timer_done bool
@@ -67,7 +67,7 @@ func (e *Elevator) Update_lights(request [][]bool) {
 				elevio.SetButtonLamp(btn, floor, e.Requests[floor][btn])
 			} else {
 				elevio.SetButtonLamp(btn, floor, request[floor][btn])
-			}	
+			}
 		}
 	}
 }
@@ -87,7 +87,7 @@ func (e *Elevator) choose_direction() {
 		} else {
 			e.Direction = elevio.MD_Stop
 		}
-	
+
 	case elevio.MD_Down:
 		if e.request_below() {
 			e.Direction = elevio.MD_Down
@@ -111,41 +111,41 @@ func (e *Elevator) choose_direction() {
 func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}) {
 	for {
 		select {
-			case <-e.Reconnect_timer.C:
-				e.Retry_counter++
-				log.Printf("Retry counter: %d \n", e.Retry_counter)
-				e.Reconnect_timer.Stop()
+		case <-e.Reconnect_timer.C:
+			e.Retry_counter++
+			log.Printf("Retry counter: %d \n", e.Retry_counter)
+			e.Reconnect_timer.Stop()
 
-				if e.Retry_counter > config.Max_retries && e.Succesor {
-					close(quitChan)
-					return
-				}
+			if e.Retry_counter > config.Max_retries && e.Succesor {
+				close(quitChan)
+				return
+			}
 
-				addr, err := network.Discover_server()
-				if err != nil {
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					continue
-				}
-				conn, err := network.Connect(addr)
-				if err != nil {
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					continue
-				}
+			addr, err := network.Discover_server()
+			if err != nil {
+				e.Reconnect_timer.Reset(config.Reconnect_delay)
+				continue
+			}
+			conn, err := network.Connect(addr)
+			if err != nil {
+				e.Reconnect_timer.Reset(config.Reconnect_delay)
+				continue
+			}
 
-				e.Retry_counter = 0 
-				e.Connection = network.New_client(conn)
-				e.Connected = true
-				e.Connection.Send(network.Message{Header: network.ClientInfo, 
-														Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
-				go e.Connection.Listen(msgChan, lossChan)
-				go e.Connection.Heart_beat()
+			e.Retry_counter = 0
+			e.Connection = network.New_client(conn)
+			e.Connected = true
+			e.Connection.Send(network.Message{Header: network.ClientInfo,
+				Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
+			go e.Connection.Listen(msgChan, lossChan)
+			go e.Connection.Heart_beat()
 
-			case <-e.Pending_ticker.C:
-				if e.Connected {
-					for _, message := range e.Pending {
-						e.Connection.Send(*message)
-					}
+		case <-e.Pending_ticker.C:
+			if e.Connected {
+				for _, message := range e.Pending {
+					e.Connection.Send(*message)
 				}
+			}
 		}
 	}
 }

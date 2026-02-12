@@ -11,10 +11,10 @@ import (
 )
 
 type Client struct {
-    Conn   *net.TCPConn
-    Reader *bufio.Reader
+	Conn   *net.TCPConn
+	Reader *bufio.Reader
 	Writer *bufio.Writer
-    Addr   string
+	Addr   string
 	Stop   chan struct{}
 }
 
@@ -41,20 +41,20 @@ func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<
 		}
 
 		client := New_client(conn)
-		newChan<- client
+		newChan <- client
 		go client.Listen(msgChan, lossChan)
 		go client.Heart_beat()
 	}
 }
 
 func New_client(conn *net.TCPConn) *Client {
-    return &Client{
-        Conn:   conn,
-        Reader: bufio.NewReader(conn),
+	return &Client{
+		Conn:   conn,
+		Reader: bufio.NewReader(conn),
 		Writer: bufio.NewWriter(conn),
-        Addr:   conn.RemoteAddr().String(),
+		Addr:   conn.RemoteAddr().String(),
 		Stop:   make(chan struct{}),
-    }
+	}
 }
 
 func (c *Client) Listen(msgChan chan<- Message, lossChan chan<- *Client) {
@@ -76,12 +76,12 @@ func (c *Client) Listen(msgChan chan<- Message, lossChan chan<- *Client) {
 		}
 
 		message.Address = c.Addr
-		msgChan<- message
+		msgChan <- message
 	}
 }
 
 func (c *Client) terminate(lossChan chan<- *Client) {
-	lossChan<- c
+	lossChan <- c
 	c.Conn.Close()
 	close(c.Stop)
 }
@@ -103,9 +103,9 @@ func (c *Client) Heart_beat() {
 
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			c.Send(Message{Header: Heartbeat})
-		case <- c.Stop:
+		case <-c.Stop:
 			return
 		}
 	}
