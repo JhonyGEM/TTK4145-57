@@ -98,7 +98,7 @@ func (c *Client) Send(message Message) {
 }
 
 func (c *Client) Heart_beat() {
-	ticker := time.NewTicker(config.Heartbeat_delay)
+	ticker := time.NewTicker(config.Heartbeat_rate)
 	defer ticker.Stop()
 
 	for {

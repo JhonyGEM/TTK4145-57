@@ -1,10 +1,10 @@
 go 1.21.6
 
 use (
-	./elevio
 	./config
-    ./elevator
-	./network
+	./elevator
+	./elevio
 	./master
+	./network
 	./utilities
 )

@@ -46,6 +46,8 @@ func main() {
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan)
 
 			go e.Timer_handler(msgChan, lossChan, quitChan)
+			e.Load_pending()
+			log.Printf("Length: %d", len(e.Pending))
 			e.Step_FSM()
 
 			for state == StateElevator {
@@ -103,6 +105,7 @@ func main() {
 					switch message.Header {
 					case network.OrderReceived:
 						e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+						e.Save_pending()
 						e.Update_lights(e.Requests)
 						e.Step_FSM()
 
@@ -119,6 +122,7 @@ func main() {
 						_, ok := e.Pending[message.UID]
 						if ok {
 							delete(e.Pending, message.UID)
+							e.Save_pending()
 						}
 
 					}
@@ -185,9 +189,10 @@ func main() {
 							} else {
 								m.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
 								m.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
+								m.Send_light_update()
 							}
 
-							if m.Should_clear_busy(msg.Address) {
+							if m.Still_busy(msg.Address) {
 								m.Client_list[msg.Address].Busy = false
 								m.Client_list[msg.Address].Task_timer.Stop()
 							} else {
@@ -196,11 +201,11 @@ func main() {
 
 						case network.Ack:
 							message := m.Pending[msg.UID]
-							m.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-							m.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
 
 							_, ok := m.Pending[msg.UID]
 							if ok {
+								m.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
+								m.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
 								delete(m.Pending, msg.UID)
 							}
 

@@ -60,9 +60,52 @@ func New_elevator(id string) *Elevator {
 	return elevator
 }
 
-func (e *Elevator) Backup_pending() {
-	data, _ := json.Marshal(e.Pending)
-	os.WriteFile("pending_backup.json", data, 0644)
+func (e *Elevator) Update_lights(request [][]bool) {
+	for floor := 0; floor < config.N_floors; floor++ {
+		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
+			if btn == elevio.BT_Cab {
+				elevio.SetButtonLamp(btn, floor, e.Requests[floor][btn])
+			} else {
+				elevio.SetButtonLamp(btn, floor, request[floor][btn])
+			}	
+		}
+	}
+}
+
+func (e *Elevator) update_direction(new_direction elevio.MotorDirection) {
+	e.Direction = new_direction
+	elevio.SetMotorDirection(new_direction)
+}
+
+func (e *Elevator) choose_direction() {
+	switch e.Direction {
+	case elevio.MD_Up:
+		if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+	
+	case elevio.MD_Down:
+		if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+
+	case elevio.MD_Stop:
+		if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+	}
 }
 
 func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}) {
@@ -70,7 +113,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 		select {
 			case <-e.Reconnect_timer.C:
 				e.Retry_counter++
-				log.Printf("Retyr counter: %d \n", e.Retry_counter)
+				log.Printf("Retry counter: %d \n", e.Retry_counter)
 				e.Reconnect_timer.Stop()
 
 				if e.Retry_counter > config.Max_retries && e.Succesor {
@@ -107,3 +150,21 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 	}
 }
 
+func (e *Elevator) Save_pending() {
+	data, _ := json.Marshal(e.Pending)
+	os.WriteFile("pending_backup.json", data, 0644)
+}
+
+func (e *Elevator) Load_pending() {
+	data, err := os.ReadFile("pending_backup.json")
+	if err != nil {
+		return
+	}
+
+	var pending map[string]*network.Message
+	if err := json.Unmarshal(data, &pending); err != nil {
+		return
+	}
+
+	e.Pending = pending
+}

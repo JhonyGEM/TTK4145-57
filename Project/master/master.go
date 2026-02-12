@@ -27,16 +27,18 @@ type Elevator_client struct {
 	Task_timer 		*time.Timer
 }
 
+// TODO: Problems
+
 // TODO: Need to implement
 // 1. Better file division and variable/function names
-// 2. Resend order after new master takeover after x seconds (handled by pending array resend?)
 // 3. Test if everyting thats implemented works
+// 4. Streamline btn light handling
+
 
 // Communication redundancy
 // each event (new reques) need an unique id
 // when elevator recieves request it will send it to master and save it pending array until it gets ack, it will be resedn if no ack in certain time window
 // master will recive the message, handle the event, send copy to sucsessor and wait for ack before sending ack to elevator
-//      maybe add local saving of the pending array
 //      the pending array will be of type message and will be keyed by event id (time at the event was send + id of client)
 
 
@@ -88,7 +90,7 @@ func (m *Master) Remove_client(addr string) {
 	}
 }
 
-func (m *Master) send_light_update() {
+func (m *Master) Send_light_update() {
 	for _, elev := range m.Client_list {
 		elev.Connection.Send(network.Message{Header: network.LightUpdate, Payload: &network.DataPayload{Lights: m.Hall_requests}})
 	}
@@ -122,7 +124,7 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
 			m.Client_list[client_addr].Busy = true
 			m.Client_list[client_addr].Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-			m.send_light_update()
+			m.Send_light_update()
 			m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
 		}
 	}
@@ -138,7 +140,7 @@ func (m *Master) Redistribute_request(id string) {
 	}
 }
 
-func (m *Master) Should_clear_busy(addr string) bool {
+func (m *Master) Still_busy(addr string) bool {
 	for f := 0; f < config.N_floors; f++ {
 		if m.Cab_requests[f][m.Client_list[addr].ID] {
 			return false
