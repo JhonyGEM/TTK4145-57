@@ -24,4 +24,4 @@ const Max_retries = 1
 // Master
 const N_elevators = 3
 const Busy_penalty = 5
-const Request_timeout = N_floors * 2 * time.Second
+const Request_timeout = N_floors * 4 * time.Second

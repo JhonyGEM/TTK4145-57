@@ -8,7 +8,7 @@ import (
 func (e *Elevator) Step_FSM() {
 	switch e.Current_state {
 	case Undefined:
-		Update_lights(e.Requests)
+		e.Update_lights(e.Requests)
 		elevio.SetDoorOpenLamp(false)
 
 		if elevio.GetFloor() == -1 {
@@ -33,7 +33,7 @@ func (e *Elevator) Step_FSM() {
 			e.update_direction(elevio.MD_Stop)
 			if e.should_clear() {
 				e.clear_at_current_floor()
-				Update_lights(e.Requests)
+				e.Update_lights(e.Requests)
 			}
 			e.Door_timer.Reset(config.Open_duration)	
 			e.Update_state(Door_open)
@@ -61,10 +61,14 @@ func (e *Elevator) Step_FSM() {
 	}
 }
 
-func Update_lights(request [][]bool) {
+func (e *Elevator) Update_lights(request [][]bool) {
 	for floor := 0; floor < config.N_floors; floor++ {
 		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
-			elevio.SetButtonLamp(btn, floor, request[floor][btn])
+			if btn == elevio.BT_Cab {
+				elevio.SetButtonLamp(btn, floor, e.Requests[floor][btn])
+			} else {
+				elevio.SetButtonLamp(btn, floor, request[floor][btn])
+			}	
 		}
 	}
 }

@@ -31,7 +31,6 @@ type Elevator_client struct {
 // 1. Better file division and variable/function names
 // 2. Resend order after new master takeover after x seconds (handled by pending array resend?)
 // 3. Test if everyting thats implemented works
-// 4. Elevator: fix lights (cab calls from master do not update)
 
 // Communication redundancy
 // each event (new reques) need an unique id

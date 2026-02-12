@@ -71,7 +71,7 @@ func main() {
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
-								elevator.Update_lights(e.Requests)
+								e.Update_lights(e.Requests)
 								e.Step_FSM()
 							} 
 						}
@@ -103,10 +103,11 @@ func main() {
 					switch message.Header {
 					case network.OrderReceived:
 						e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+						e.Update_lights(e.Requests)
 						e.Step_FSM()
 
 					case network.LightUpdate:
-						elevator.Update_lights(message.Payload.Lights)
+						e.Update_lights(message.Payload.Lights)
 
 					case network.Backup:
 						log.Printf("Recieved backup")
