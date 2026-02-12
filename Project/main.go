@@ -7,7 +7,6 @@ import (
 	"log"
 	"master"
 	"network"
-	"time"
 	"utilities"
 )
 
@@ -124,7 +123,6 @@ func main() {
 					}
 				case <-quitChan:
 					state = StateMaster
-					time.Sleep(5 * time.Second)
 					utilities.Start_new_instance()
 					continue
 				}
@@ -191,6 +189,8 @@ func main() {
 							if m.Should_clear_busy(msg.Address) {
 								m.Client_list[msg.Address].Busy = false
 								m.Client_list[msg.Address].Task_timer.Stop()
+							} else {
+								m.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
 							}
 
 						case network.Ack:

@@ -29,9 +29,9 @@ type Elevator_client struct {
 
 // TODO: Need to implement
 // 1. Better file division and variable/function names
-// 2. Redundancy in communication / sync of hall and cab request from master (maybe WAL or loging of messages?)
-// 4. Resend order after new master takeover after x seconds
-// 5. Test if everyting thats implemented works
+// 2. Resend order after new master takeover after x seconds (handled by pending array resend?)
+// 3. Test if everyting thats implemented works
+// 4. Elevator: fix lights (cab calls from master do not update)
 
 // Communication redundancy
 // each event (new reques) need an unique id

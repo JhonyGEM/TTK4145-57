@@ -78,25 +78,25 @@ func (e *Elevator) should_clear() bool {
 func (e *Elevator) clear_at_current_floor() {
 	e.Requests[e.Current_floor][elevio.BT_Cab] = false
 	if e.Connected {
-		e.Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_Cab}})
+		e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_Cab}})
 	}
 	
 	if (e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
 		e.Requests[e.Current_floor][elevio.BT_HallUp] = false
 		if e.Connected {
-			e.Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
 		}
 	} else if (e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
 		e.Requests[e.Current_floor][elevio.BT_HallDown] = false
 		if e.Connected {
-			e.Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
 		}
 	} else {
 		e.Requests[e.Current_floor][elevio.BT_HallUp] = false
 		e.Requests[e.Current_floor][elevio.BT_HallDown] = false
 		if e.Connected {
-			e.Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
-			e.Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
 		}
 	}
 }
