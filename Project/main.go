@@ -155,72 +155,72 @@ func main() {
 		case StateMaster:
 			log.Printf("Starting master \n")
 
-			master := master.New_master()
-			master.Cab_requests = backup_cab_reg
-			master.Hall_requests = backup_hall_reg
+			mast := master.New_master()
+			mast.Cab_requests = backup_cab_reg
+			mast.Hall_requests = backup_hall_reg
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.N_elevators*2)
 
 			go network.Start_server(lossChan, newChan, msgChan)
-			go master.Client_timer_handler(lossChan)
+			go mast.Client_timer_handler(lossChan)
 
 			for {
 				select {
 				case new := <-newChan:
-					addNewClient(master, new)
+					addNewClient(mast, new)
 
 				case lost := <-lossChan:
-					removeClient(master, lost)
+					removeClient(mast, lost)
 
 				case msg := <-msgChan:
 					log.Printf("Recived message from %s with header: %d", msg.Address, msg.Header)
 					switch msg.Header {
 					case network.OrderReceived:
 						if msg.Payload.OrderButton == elevio.BT_Cab {
-							master.Cab_requests[msg.Payload.OrderFloor][master.Client_list[msg.Address].ID] = true
+							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
 						} else {
-							master.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
 						}
-						master.Client_list[master.Successor_addr].Connection.Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: master.Hall_requests, BackupCab: master.Cab_requests}, UID: msg.UID})
-						master.Pending[msg.UID] = &msg
+						mast.Client_list[mast.Successor_addr].Connection.Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
+						mast.Pending[msg.UID] = &msg
 
 					case network.OrderFulfilled:
 						if msg.Payload.OrderButton == elevio.BT_Cab {
-							master.Cab_requests[msg.Payload.OrderFloor][master.Client_list[msg.Address].ID] = false
+							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
 						} else {
-							master.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
-							master.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
+							mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
 						}
 
-						if master.Should_clear_busy(msg.Address) {
-							master.Client_list[msg.Address].Busy = false
-							master.Client_list[msg.Address].Task_timer.Stop()
+						if mast.Still_busy(msg.Address) {
+							mast.Client_list[msg.Address].Busy = false
+							mast.Client_list[msg.Address].Task_timer.Stop()
 						} else {
-							master.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
+							mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
 						}
 
 					case network.Ack:
-						message := master.Pending[msg.UID]
+						message := mast.Pending[msg.UID]
 
-						_, ok := master.Pending[msg.UID]
+						_, ok := mast.Pending[msg.UID]
 						if ok {
-							master.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-							master.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
-							delete(master.Pending, msg.UID)
+							mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
+							mast.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
+							delete(mast.Pending, msg.UID)
 						}
 
 					case network.FloorUpdate:
-						master.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
 
 					case network.ObstructionUpdate:
-						master.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
 
 					case network.ClientInfo:
-						master.Client_list[msg.Address].ID = msg.Payload.ID
-						master.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-						master.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+						mast.Client_list[msg.Address].ID = msg.Payload.ID
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
 					}
 				}
 			}
@@ -229,26 +229,26 @@ func main() {
 }
 
 func addNewClient(m *master.Master, conn *network.Client) {
-	if len(master.Client_list) == 0 {
-		master.Successor_addr = new.Addr
+	if len(m.Client_list) == 0 {
+		m.Successor_addr = conn.Addr
 	}
-	master.Add_client(new)
+	m.Add_client(conn)
 }
 
 func removeClient(m *master.Master, conn *network.Client) {
-	id := master.Client_list[conn.Addr].ID
-	master.Remove_client(conn.Addr)
+	id := m.Client_list[conn.Addr].ID
+	m.Remove_client(conn.Addr)
 
-	if len(master.Client_list) == 0 {
+	if len(m.Client_list) == 0 {
 		panic("Loss of connectivity")
 	} else {
-		if conn.Addr == master.Successor_addr {
-			for _, c := range master.Client_list {
-				master.Successor_addr = c.Connection.Addr
+		if conn.Addr == m.Successor_addr {
+			for _, c := range m.Client_list {
+				m.Successor_addr = c.Connection.Addr
 				break
 			}
 		}
 
-		master.Redistribute_request(id)
+		m.Redistribute_request(id)
 	}
 }
