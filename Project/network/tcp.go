@@ -86,10 +86,10 @@ func (c *Client) terminate(lossChan chan<- *Client) {
 	close(c.Stop)
 }
 
-func (c *Client) Send(header HeaderType, data *DataPayload) {
-	message, _ := json.Marshal(Message{Header: header, Payload: data})
+func (c *Client) Send(message Message) {
+	packet, _ := json.Marshal(message)
 
-	_, err := c.Writer.WriteString(string(message) + "\n")
+	_, err := c.Writer.WriteString(string(packet) + "\n")
 	if err != nil {
 		log.Printf("Failed to send message: %v", err)
 	}
@@ -104,7 +104,7 @@ func (c *Client) Heart_beat() {
 	for {
 		select {
 		case <- ticker.C:
-			c.Send(Heartbeat, nil)
+			c.Send(Message{Header: Heartbeat})
 		case <- c.Stop:
 			return
 		}

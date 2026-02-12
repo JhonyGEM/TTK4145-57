@@ -18,6 +18,8 @@ const Dialer_timeout = 5 * time.Second
 const Inactivity_timeout = 10 * time.Second
 const Heartbeat_delay = 5 * time.Second
 const Reconnect_delay = 5 * time.Second
+const Pending_resend_delay = 60 * time.Second
+const Max_retries = 1
 
 // Master
 const N_elevators = 3

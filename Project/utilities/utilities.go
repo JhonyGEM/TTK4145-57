@@ -1,9 +1,11 @@
 package utilities
 
 import (
+	"fmt"
 	"os/exec"
 	"runtime"
 	"log"
+	"time"
 )
 
 func Create_request_arr(rows, cols int) [][]bool {
@@ -16,12 +18,13 @@ func Create_request_arr(rows, cols int) [][]bool {
 	return q
 }
 
-func Start_new_master() {
-	if runtime.GOOS == "windows" {
-		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "run_master.go").Run()
-	} else if runtime.GOOS == "linux" {
-		exec.Command("gnome-terminal", "--", "go", "run", "run_master.go").Run()
-	} else {
+func Start_new_instance() {
+	switch runtime.GOOS {
+	case "windows":
+		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go").Run()
+	case "linux":
+		exec.Command("gnome-terminal", "--", "go", "run", "main.go").Run()
+	default:
 		log.Print("Not supported os.")
 	}
 }
@@ -31,4 +34,8 @@ func Abs(x int) int {
 		return - x
 	}
 	return x
+}
+
+func Gen_uid(client_id string) string {
+	return fmt.Sprintf("%s-%d", client_id, time.Now().UnixNano())
 }

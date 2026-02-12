@@ -74,57 +74,89 @@ func SetStopLamp(value bool) {
 	write([4]byte{5, toByte(value), 0, 0})
 }
 
-
-
-func PollButtons(receiver chan<- ButtonEvent) {
+func PollButtons(receiver chan<- ButtonEvent, quitChan <-chan struct{}) {
 	prev := make([][3]bool, _numFloors)
+	ticker := time.NewTicker(_pollRate)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(_pollRate)
-		for f := 0; f < _numFloors; f++ {
-			for b := ButtonType(0); b < 3; b++ {
-				v := GetButton(b, f)
-				if v != prev[f][b] && v != false {
-					receiver <- ButtonEvent{f, ButtonType(b)}
+		select {
+		case <-quitChan:
+			_initialized = false
+			_conn.Close()
+			return
+
+		case <-ticker.C:
+			for f := 0; f < _numFloors; f++ {
+				for b := ButtonType(0); b < 3; b++ {
+					v := GetButton(b, f)
+					if v != prev[f][b] && v != false {
+						receiver <- ButtonEvent{f, ButtonType(b)}
+					}
+					prev[f][b] = v
 				}
-				prev[f][b] = v
 			}
 		}
 	}
 }
 
-func PollFloorSensor(receiver chan<- int) {
+func PollFloorSensor(receiver chan<- int, quitChan <-chan struct{}) {
 	prev := -1
+	ticker := time.NewTicker(_pollRate)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(_pollRate)
-		v := GetFloor()
-		if v != prev && v != -1 {
-			receiver <- v
+		select {
+		case <-quitChan:
+			return
+
+		case <-ticker.C:
+			v := GetFloor()
+			if v != prev && v != -1 {
+				receiver <- v
+			}
+			prev = v
 		}
-		prev = v
 	}
 }
 
-func PollStopButton(receiver chan<- bool) {
+func PollStopButton(receiver chan<- bool, quitChan <-chan struct{}) {
 	prev := false
+	ticker := time.NewTicker(_pollRate)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(_pollRate)
-		v := GetStop()
-		if v != prev {
-			receiver <- v
+		select {
+		case <-quitChan:
+			return
+
+		case <-ticker.C:
+			v := GetStop()
+			if v != prev {
+				receiver <- v
+			}
+			prev = v
 		}
-		prev = v
 	}
 }
 
-func PollObstructionSwitch(receiver chan<- bool) {
+func PollObstructionSwitch(receiver chan<- bool, quitChan <-chan struct{}) {
 	prev := false
+	ticker := time.NewTicker(_pollRate)
+	defer ticker.Stop()
+
 	for {
-		time.Sleep(_pollRate)
-		v := GetObstruction()
-		if v != prev {
-			receiver <- v
+		select {
+		case <-quitChan:
+			return
+			
+		case <-ticker.C:
+			v := GetObstruction()
+			if v != prev {
+				receiver <- v
+			}
+			prev = v
 		}
-		prev = v
 	}
 }
 

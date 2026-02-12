@@ -6,156 +6,104 @@ import (
 	"network"
 	"time"
 	"utilities"
+	"encoding/json"
+	"os"
+	"log"
 )
 
 type state int
 
 const (
-	undefined state = iota
-	idle
-	moving
-	door_open
+	Undefined state = iota
+	Idle
+	Moving
+	Door_open
 )
 
 type Elevator struct {
-	current_state   state
-	current_floor   int
-	direction       elevio.MotorDirection
-	obstruction     bool
-	requests        [][]bool
-	id              string
-	succesor        bool
+	Current_state   state
+	Current_floor   int
+	Direction       elevio.MotorDirection
+	Obstruction     bool
+	Requests        [][]bool
+	Id              string
+	Succesor        bool
 	//Network
 	Connection      *network.Client
-	connected       bool
-	retry_counter   int
+	Connected       bool
+	Retry_counter   int
+	Pending         map[string]*network.Message
 	//Timers
-	door_timer      *time.Timer
-	door_timer_done bool
-	reconnect_timer *time.Timer
+	Door_timer      *time.Timer
+	Door_timer_done bool
+	Reconnect_timer *time.Timer
+	Pending_ticker  *time.Ticker
 }
 
-func new_elevator(id string) *Elevator {
+func New_elevator(id string) *Elevator {
 	elevator := &Elevator{
-		current_state:   undefined,
-		current_floor:   -1,
-		requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
-		id:              id,
-		succesor:        true,
-		connected:       false,
-		retry_counter:   0,
-		door_timer:      time.NewTimer(config.Open_duration),
-		reconnect_timer: time.NewTimer(config.Reconnect_delay),
+		Current_state:   Undefined,
+		Current_floor:   -1,
+		Requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
+		Id:              id,
+		Succesor:        true,
+		Connected:       false,
+		Retry_counter:   0,
+		Pending:         make(map[string]*network.Message),
+		Door_timer:      time.NewTimer(config.Open_duration),
+		Reconnect_timer: time.NewTimer(config.Reconnect_delay),
+		Pending_ticker:  time.NewTicker(config.Pending_resend_delay),
 	}
-	elevator.door_timer.Stop()
-	elevator.door_timer_done = false
+	elevator.Door_timer.Stop()
+	elevator.Door_timer_done = false
 
 	return elevator
 }
 
-func Run_elevator(id string) {
-	elevator := new_elevator(id)
-	elevio.Init("localhost:15657", config.N_floors)
-	
-	drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
-	drv_floors := make(chan int)
-	drv_obstruction := make(chan bool)
+func (e *Elevator) Backup_pending() {
+	data, _ := json.Marshal(e.Pending)
+	os.WriteFile("pending_backup.json", data, 0644)
+}
 
-	lossChan := make(chan *network.Client)
-	msgChan := make(chan network.Message)
-	var prev_btn elevio.ButtonEvent
-
-	go elevio.PollButtons(drv_buttons)
-	go elevio.PollFloorSensor(drv_floors)
-	go elevio.PollObstructionSwitch(drv_obstruction)
-
-	elevator.step_FSM()
-
+func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}) {
 	for {
 		select {
-		case floor := <-drv_floors:
-			if floor != -1 {
-				elevator.current_floor = floor
-				elevio.SetFloorIndicator(floor)
-				elevator.step_FSM()
-				if elevator.connected {
-					elevator.Connection.Send(network.FloorUpdate, &network.DataPayload{CurrentFloor: elevator.current_floor})
+			case <-e.Reconnect_timer.C:
+				e.Retry_counter++
+				log.Printf("Retyr counter: %d \n", e.Retry_counter)
+				e.Reconnect_timer.Stop()
+
+				if e.Retry_counter > config.Max_retries && e.Succesor {
+					close(quitChan)
+					return
 				}
-			}
-		
-		case btn := <-drv_buttons:
-			if prev_btn != btn {
-				prev_btn = btn
-				if elevator.connected {
-					elevator.Connection.Send(network.OrderReceived, &network.DataPayload{OrderFloor: btn.Floor, OrderButton: btn.Button})
-				} else {
-					if btn.Button == elevio.BT_Cab {
-						elevator.requests[btn.Floor][btn.Button] = true
-						update_lights(elevator.requests)
-						elevator.step_FSM()
-					} 
+
+				addr, err := network.Discover_server()
+				if err != nil {
+					e.Reconnect_timer.Reset(config.Reconnect_delay)
+					continue
 				}
-			}
+				conn, err := network.Connect(addr)
+				if err != nil {
+					e.Reconnect_timer.Reset(config.Reconnect_delay)
+					continue
+				}
 
-		case obs := <-drv_obstruction:
-			elevator.obstruction = obs
-			elevator.step_FSM()
-			if elevator.connected {
-				elevator.Connection.Send(network.ObstructionUpdate, &network.DataPayload{Obstruction: elevator.obstruction})
-			}
+				e.Retry_counter = 0 
+				e.Connection = network.New_client(conn)
+				e.Connected = true
+				e.Connection.Send(network.Message{Header: network.ClientInfo, 
+														Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
+				go e.Connection.Listen(msgChan, lossChan)
+				go e.Connection.Heart_beat()
 
-		case <-elevator.door_timer.C:
-			elevator.door_timer.Stop()
-			elevator.door_timer_done = true
-			elevator.step_FSM()
-
-		case <-elevator.reconnect_timer.C:
-			elevator.reconnect_timer.Stop()
-
-			if elevator.retry_counter > 3 && elevator.succesor {
-				utilities.Start_new_master()
-				continue
-			}
-
-			addr, err := network.Discover_server()
-			if err != nil {
-				elevator.reconnect_timer.Reset(config.Reconnect_delay)
-				elevator.retry_counter++
-				continue
-			}
-			conn, err := network.Connect(addr)
-			if err != nil {
-				elevator.reconnect_timer.Reset(config.Reconnect_delay)
-				elevator.retry_counter++
-				continue
-			}
-
-			elevator.retry_counter = 0 
-			elevator.Connection = network.New_client(conn)
-			elevator.connected = true
-			elevator.Connection.Send(network.ClientInfo, &network.DataPayload{ID: elevator.id, CurrentFloor: elevator.current_floor, Obstruction: elevator.obstruction})
-			go elevator.Connection.Listen(msgChan, lossChan)
-			go elevator.Connection.Heart_beat()
-
-		case <-lossChan:
-			elevator.connected = false
-			elevator.Connection = &network.Client{}
-			elevator.reconnect_timer.Reset(config.Reconnect_delay)
-			elevator.remove_hall_requests()
-			elevator.update_state(undefined)
-			elevator.step_FSM()
-
-		case message := <-msgChan:
-			switch message.Header {
-			case network.OrderReceived:
-				elevator.requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
-				update_lights(elevator.requests)
-				elevator.step_FSM()
-
-			case network.LightUpdate:
-				update_lights(message.Payload.Lights)
-
-			}
+			case <-e.Pending_ticker.C:
+				if e.Connected {
+					for _, message := range e.Pending {
+						e.Connection.Send(*message)
+					}
+				}
 		}
 	}
 }
+

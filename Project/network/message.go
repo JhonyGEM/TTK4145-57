@@ -14,7 +14,8 @@ const (
     ClientInfo
     Heartbeat
     LightUpdate
-	RequestCopy
+	Backup
+	Ack
 )
 
 type DataPayload struct {
@@ -24,12 +25,13 @@ type DataPayload struct {
 	OrderFloor   int                    `json:"order_floor,omitempty"`
 	OrderButton  elevio.ButtonType      `json:"order_button,omitempty"`
 	Lights       [][]bool               `json:"lights,omitempty"`
-	CopyHallReq  [][]bool               `json:"copy_hall_req,omitempty"`
-	CopyCabReq   []map[string]bool      `json:"copy_cab_req,omitempty"`
+	BackupHall   [][]bool               `json:"backup_hall,omitempty"`
+	BackupCab    []map[string]bool      `json:"backup_cab,omitempty"`
 }
 
 type Message struct {
 	Header  HeaderType      		`json:"header"`
 	Payload *DataPayload			`json:"payload,omitempty"`
 	Address string					`json:"address,omitempty"`
+	UID     string                  `json:"uid,omitempty"`
 }

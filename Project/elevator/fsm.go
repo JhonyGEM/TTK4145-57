@@ -5,63 +5,63 @@ import (
 	"elevio"
 )
 
-func (e *Elevator) step_FSM() {
-	switch e.current_state {
-	case undefined:
-		update_lights(e.requests)
+func (e *Elevator) Step_FSM() {
+	switch e.Current_state {
+	case Undefined:
+		Update_lights(e.Requests)
 		elevio.SetDoorOpenLamp(false)
 
 		if elevio.GetFloor() == -1 {
 			e.update_direction(elevio.MD_Down)
 		} else {
 			e.update_direction(elevio.MD_Stop)
-			e.update_state(idle)
+			e.Update_state(Idle)
 		}
 
-	case idle:
+	case Idle:
 		if (e.pending_request()) {
 			if (e.request_here()) {
-				e.door_timer.Reset(config.Open_duration)
-				e.update_state(door_open)
+				e.Door_timer.Reset(config.Open_duration)
+				e.Update_state(Door_open)
 			} else {
-				e.update_state(moving)
+				e.Update_state(Moving)
 			}
 		}
 
-	case moving:
+	case Moving:
 		if (e.should_stop() && elevio.GetFloor() != -1) {
 			e.update_direction(elevio.MD_Stop)
 			if e.should_clear() {
 				e.clear_at_current_floor()
-				update_lights(e.requests)
+				Update_lights(e.Requests)
 			}
-			e.door_timer.Reset(config.Open_duration)	
-			e.update_state(door_open)
+			e.Door_timer.Reset(config.Open_duration)	
+			e.Update_state(Door_open)
 		} else {
 			e.choose_direction()
-			e.update_direction(e.direction)
+			e.update_direction(e.Direction)
 		}
 
-	case door_open:
+	case Door_open:
 		elevio.SetDoorOpenLamp(true)
 
-		if (e.obstruction) {
-			e.door_timer.Reset(config.Open_duration)
+		if (e.Obstruction) {
+			e.Door_timer.Reset(config.Open_duration)
 		} else {
-			if e.door_timer_done {
+			if e.Door_timer_done {
 				elevio.SetDoorOpenLamp(false)
-				e.door_timer_done = false
+				e.Door_timer_done = false
 				if e.pending_request() {
-					e.update_state(moving)
+					e.Update_state(Moving)
 				} else {
-					e.update_state(idle)
+					e.Update_state(Idle)
 				}
 			}
 		}
 	}
 }
 
-func update_lights(request [][]bool) {
+func Update_lights(request [][]bool) {
 	for floor := 0; floor < config.N_floors; floor++ {
 		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
 			elevio.SetButtonLamp(btn, floor, request[floor][btn])
@@ -69,43 +69,43 @@ func update_lights(request [][]bool) {
 	}
 }
 
-func (e *Elevator) update_state(new_state state) {
-	e.current_state = new_state
-	e.step_FSM()
+func (e *Elevator) Update_state(new_state state) {
+	e.Current_state = new_state
+	e.Step_FSM()
 }
 
 func (e *Elevator) update_direction(new_direction elevio.MotorDirection) {
-	e.direction = new_direction
+	e.Direction = new_direction
 	elevio.SetMotorDirection(new_direction)
 }
 
 func (e *Elevator) choose_direction() {
-	switch e.direction {
+	switch e.Direction {
 	case elevio.MD_Up:
 		if e.request_above() {
-			e.direction = elevio.MD_Up
+			e.Direction = elevio.MD_Up
 		} else if e.request_below() {
-			e.direction = elevio.MD_Down
+			e.Direction = elevio.MD_Down
 		} else {
-			e.direction = elevio.MD_Stop
+			e.Direction = elevio.MD_Stop
 		}
 	
 	case elevio.MD_Down:
 		if e.request_below() {
-			e.direction = elevio.MD_Down
+			e.Direction = elevio.MD_Down
 		} else if e.request_above() {
-			e.direction = elevio.MD_Up
+			e.Direction = elevio.MD_Up
 		} else {
-			e.direction = elevio.MD_Stop
+			e.Direction = elevio.MD_Stop
 		}
 
 	case elevio.MD_Stop:
 		if e.request_above() {
-			e.direction = elevio.MD_Up
+			e.Direction = elevio.MD_Up
 		} else if e.request_below() {
-			e.direction = elevio.MD_Down
+			e.Direction = elevio.MD_Down
 		} else {
-			e.direction = elevio.MD_Stop
+			e.Direction = elevio.MD_Stop
 		}
 	}
 }
