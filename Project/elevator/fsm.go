@@ -1,8 +1,8 @@
 package elevator
 
 import (
-	"config"
-	"elevio"
+	"project/config"
+	"project/elevio"
 )
 
 func (e *Elevator) Step_FSM() {
@@ -22,7 +22,9 @@ func (e *Elevator) Step_FSM() {
 		if (e.pending_request()) {
 			if (e.request_here()) {
 				e.clear_at_current_floor()
-				e.Update_lights(e.Requests)
+				if !e.Connected {
+					e.Update_lights(e.Requests)
+				}
 				e.Door_timer.Reset(config.Open_duration)
 				e.Update_state(Door_open)
 			} else {
@@ -35,7 +37,9 @@ func (e *Elevator) Step_FSM() {
 			e.update_direction(elevio.MD_Stop)
 			if e.should_clear() {
 				e.clear_at_current_floor()
-				e.Update_lights(e.Requests)
+				if !e.Connected {
+					e.Update_lights(e.Requests)
+				}
 			}
 			e.Door_timer.Reset(config.Open_duration)	
 			e.Update_state(Door_open)
@@ -66,4 +70,40 @@ func (e *Elevator) Step_FSM() {
 func (e *Elevator) Update_state(new_state state) {
 	e.Current_state = new_state
 	e.Step_FSM()
+}
+
+func (e *Elevator) update_direction(new_direction elevio.MotorDirection) {
+	e.Direction = new_direction
+	elevio.SetMotorDirection(new_direction)
+}
+
+func (e *Elevator) choose_direction() {
+	switch e.Direction {
+	case elevio.MD_Up:
+		if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+	
+	case elevio.MD_Down:
+		if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+
+	case elevio.MD_Stop:
+		if e.request_above() {
+			e.Direction = elevio.MD_Up
+		} else if e.request_below() {
+			e.Direction = elevio.MD_Down
+		} else {
+			e.Direction = elevio.MD_Stop
+		}
+	}
 }

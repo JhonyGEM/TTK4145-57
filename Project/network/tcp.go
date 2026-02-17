@@ -1,9 +1,9 @@
 package network
 
 import (
-	"bufio"
-	"config"
+	"project/config"
 	"encoding/json"
+	"bufio"
 	"log"
 	"net"
 	"strings"

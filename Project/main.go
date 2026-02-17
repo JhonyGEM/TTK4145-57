@@ -1,13 +1,14 @@
 package main
 
 import (
-	"config"
-	"elevator"
-	"elevio"
+	"project/config"
+	"project/elevator"
+	"project/elevio"
+	"project/master"
+	"project/network"
+	"project/utilities"
+	"flag"
 	"log"
-	"master"
-	"network"
-	"utilities"
 )
 
 type PairState int
@@ -17,9 +18,20 @@ const (
 	StateMaster
 )
 
+// TODO: Problems
+
+
+// TODO: Need to do
+// 1. Imporve code quality
+// 2. Test if everyting thats implemented works
+// 3. redo the heart beat so it only send beats when inactivity exceeds time limit but is less than timeout time limit
 
 func main() {
 	state := StateElevator
+
+	succesor := flag.Bool("succesor", false, "Succesor enable")
+	id := flag.String("id", "", "ID value")
+	flag.Parse()
 
 	backup_hall_reg := utilities.Create_request_arr(config.N_floors, config.N_buttons)
 	backup_cab_reg := master.Create_cab_requests(config.N_floors)
@@ -29,9 +41,11 @@ func main() {
 		case StateElevator:
 			log.Printf("Starting elevator \n")
 
-			e := elevator.New_elevator("pop")
+			e := elevator.New_elevator(*id)
 			elevio.Init("localhost:15657", config.N_floors)
-			
+			e.Succesor = *succesor
+			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
+
 			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
 			drv_floors := make(chan int)
 			drv_obstruction := make(chan bool)
@@ -39,15 +53,13 @@ func main() {
 			lossChan := make(chan *network.Client)
 			msgChan := make(chan network.Message)
 			quitChan := make(chan struct{})
-			var prev_btn elevio.ButtonEvent
 
 			go elevio.PollButtons(drv_buttons, quitChan)
 			go elevio.PollFloorSensor(drv_floors, quitChan)
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan)
-
 			go e.Timer_handler(msgChan, lossChan, quitChan)
+
 			e.Load_pending()
-			log.Printf("Length: %d", len(e.Pending))
 			e.Step_FSM()
 
 			for state == StateElevator {
@@ -58,8 +70,8 @@ func main() {
 						elevio.SetFloorIndicator(floor)
 						e.Step_FSM()
 						if e.Connected {
-							e.Connection.Send(network.Message{Header: network.FloorUpdate, 
-																	Payload: &network.DataPayload{CurrentFloor: e.Current_floor}})
+							e.Send(network.Message{Header: network.FloorUpdate, 
+												   Payload: &network.DataPayload{CurrentFloor: e.Current_floor}})
 						}
 					}
 				
@@ -69,7 +81,7 @@ func main() {
 						if e.Connected {
 							message := network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, UID: utilities.Gen_uid(e.Id)}
 							e.Pending[message.UID] = &message
-							e.Connection.Send(message)
+							e.Send(message)
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
@@ -83,8 +95,8 @@ func main() {
 					e.Obstruction = obs
 					e.Step_FSM()
 					if e.Connected {
-						e.Connection.Send(network.Message{Header: network.ObstructionUpdate, 
-																Payload: &network.DataPayload{Obstruction: e.Obstruction}})
+						e.Send(network.Message{Header: network.ObstructionUpdate, 
+											   Payload: &network.DataPayload{Obstruction: e.Obstruction}})
 					}
 
 				case <-e.Door_timer.C:
@@ -101,12 +113,11 @@ func main() {
 					e.Step_FSM()
 
 				case message := <-msgChan:
-					log.Printf("Recieved message")
+					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
 						e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 						e.Save_pending()
-						e.Update_lights(e.Requests)
 						e.Step_FSM()
 
 					case network.LightUpdate:
@@ -116,7 +127,7 @@ func main() {
 						log.Printf("Recieved backup")
 						backup_cab_reg = message.Payload.BackupCab
 						backup_hall_reg = message.Payload.BackupHall
-						e.Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
+						e.Send(network.Message{Header: network.Ack, UID: message.UID})
 
 					case network.Ack:
 						_, ok := e.Pending[message.UID]
@@ -125,10 +136,12 @@ func main() {
 							e.Save_pending()
 						}
 
+					case network.Succesor:
+						e.Succesor = true
 					}
 				case <-quitChan:
 					state = StateMaster
-					utilities.Start_new_instance()
+					utilities.Start_new_instance(e.Id)
 					continue
 				}
 			}
@@ -151,10 +164,11 @@ func main() {
 			for {
 				select {
 					case new := <-newChan:
-						if len(m.Client_list) == 0 {
-							m.Successor_addr = new.Addr
-						}
 						m.Add_client(new)
+						if len(m.Client_list) == 1 {
+							m.Successor_addr = new.Addr
+							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
+						}
 
 					case lost := <-lossChan:
 						id := m.Client_list[lost.Addr].ID
@@ -165,6 +179,7 @@ func main() {
 							if lost.Addr == m.Successor_addr {
 								for _, c := range m.Client_list {
 									m.Successor_addr = c.Connection.Addr
+									c.Send(network.Message{Header: network.Succesor})
 									break
 								}
 							}
@@ -172,7 +187,7 @@ func main() {
 						}
 
 					case msg := <-msgChan:
-						log.Printf("Recived message from %s with header: %d", msg.Address, msg.Header)
+						log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
 						switch msg.Header {
 						case network.OrderReceived:
 							if msg.Payload.OrderButton == elevio.BT_Cab {
@@ -180,7 +195,7 @@ func main() {
 							} else {
 								m.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
 							}
-							m.Client_list[m.Successor_addr].Connection.Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, UID: msg.UID})
+							m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, UID: msg.UID})
 							m.Pending[msg.UID] = &msg
 
 						case network.OrderFulfilled:
@@ -189,8 +204,8 @@ func main() {
 							} else {
 								m.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
 								m.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
-								m.Send_light_update()
 							}
+							m.Send_light_update()
 
 							if m.Still_busy(msg.Address) {
 								m.Client_list[msg.Address].Busy = false
@@ -205,7 +220,7 @@ func main() {
 							_, ok := m.Pending[msg.UID]
 							if ok {
 								m.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-								m.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
+								m.Client_list[message.Address].Send(network.Message{Header: network.Ack, UID: message.UID})
 								delete(m.Pending, msg.UID)
 							}
 
@@ -219,7 +234,13 @@ func main() {
 							m.Client_list[msg.Address].ID = msg.Payload.ID
 							m.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
 							m.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+							m.Resend_cab_request(msg.Address)
 						}
+
+					case <-m.Resend_ticker.C:
+						if len(m.Client_list) > 0 {
+							m.Resend_hall_request() 
+						} 
 				}
 			}
 		}
