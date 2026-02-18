@@ -53,7 +53,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 				e.Send(network.Message{Header: network.ClientInfo, 
 									   Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
-				go e.Connection.Heart_beat()
+				go e.Connection.Heartbeat()
 
 			case <-e.Pending_ticker.C:
 				if e.Connected {

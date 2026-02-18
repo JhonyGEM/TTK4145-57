@@ -24,7 +24,6 @@ const (
 // TODO: Need to do
 // 1. Imporve code quality
 // 2. Test if everyting thats implemented works
-// 3. redo the heart beat so it only send beats when inactivity exceeds time limit but is less than timeout time limit
 
 func main() {
 	state := StateElevator
