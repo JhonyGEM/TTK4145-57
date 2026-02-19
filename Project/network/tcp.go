@@ -1,9 +1,9 @@
 package network
 
 import (
-	"bufio"
-	"config"
+	"project/config"
 	"encoding/json"
+	"bufio"
 	"log"
 	"net"
 	"strings"
@@ -14,7 +14,8 @@ type Client struct {
 	Conn   *net.TCPConn
 	Reader *bufio.Reader
 	Writer *bufio.Writer
-	Addr   string
+    Addr   string
+	Activity chan struct{}
 	Stop   chan struct{}
 }
 
@@ -43,7 +44,7 @@ func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<
 		client := New_client(conn)
 		newChan <- client
 		go client.Listen(msgChan, lossChan)
-		go client.Heart_beat()
+		go client.Heartbeat()
 	}
 }
 
@@ -52,7 +53,8 @@ func New_client(conn *net.TCPConn) *Client {
 		Conn:   conn,
 		Reader: bufio.NewReader(conn),
 		Writer: bufio.NewWriter(conn),
-		Addr:   conn.RemoteAddr().String(),
+        Addr:   conn.RemoteAddr().String(),
+		Activity: make(chan struct{}),
 		Stop:   make(chan struct{}),
 	}
 }
@@ -95,17 +97,33 @@ func (c *Client) Send(message Message) {
 	}
 
 	c.Writer.Flush()
+
+	select {
+	case c.Activity <- struct{}{}:
+	default:
+	}
 }
 
-func (c *Client) Heart_beat() {
-	ticker := time.NewTicker(config.Heartbeat_rate)
-	defer ticker.Stop()
+func (c *Client) Heartbeat() {
+	idle_timer := time.NewTimer(config.Heartbeat_interval)
+	defer idle_timer.Stop()
 
 	for {
 		select {
-		case <-ticker.C:
+		case <- idle_timer.C:
 			c.Send(Message{Header: Heartbeat})
-		case <-c.Stop:
+			idle_timer.Reset(config.Heartbeat_interval)
+
+		case <- c.Activity:
+			if !idle_timer.Stop() {
+				select {
+				case <- idle_timer.C:
+				default:
+				}
+			}
+			idle_timer.Reset(config.Heartbeat_interval)
+
+		case <- c.Stop:
 			return
 		}
 	}

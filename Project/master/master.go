@@ -1,21 +1,21 @@
 package master
 
 import (
-	"config"
-	"elevio"
-	"log"
-	"network"
+	"project/config"
+	"project/elevio"
+	"project/network"
+	"project/utilities"
 	"time"
-	"utilities"
 )
 
 type Master struct {
-	Client_list      map[string]*Elevator_client // key is addr
-	Hall_requests    [][]bool
-	Hall_assignments [][]string
-	Cab_requests     []map[string]bool
-	Successor_addr   string
-	Pending          map[string]*network.Message
+	Client_list 	     map[string]*Elevator_client // key is addr
+	Hall_requests        [][]bool
+	Hall_assignments     [][]string
+	Cab_requests         []map[string]bool
+	Successor_addr       string
+	Pending              map[string]*network.Message
+	Resend_ticker        *time.Ticker
 }
 
 type Elevator_client struct {
@@ -26,19 +26,6 @@ type Elevator_client struct {
 	Busy          bool
 	Task_timer    *time.Timer
 }
-
-// TODO: Problems
-
-// TODO: Need to implement
-// 1. Better file division and variable/function names
-// 3. Test if everyting thats implemented works
-// 4. Streamline btn light handling
-
-// Communication redundancy
-// each event (new reques) need an unique id
-// when elevator recieves request it will send it to master and save it pending array until it gets ack, it will be resedn if no ack in certain time window
-// master will recive the message, handle the event, send copy to sucsessor and wait for ack before sending ack to elevator
-//      the pending array will be of type message and will be keyed by event id (time at the event was send + id of client)
 
 func Create_cab_requests(floor int) []map[string]bool {
 	cab_requests := make([]map[string]bool, floor)
@@ -63,110 +50,17 @@ func New_master() *Master {
 		Hall_assignments: create_hall_assignments(config.N_floors, config.N_buttons),
 		Cab_requests:     Create_cab_requests(config.N_floors),
 		Pending:          make(map[string]*network.Message),
-	}
-}
-
-func (m *Master) Add_client(c *network.Client) {
-	elev := &Elevator_client{
-		Connection:    c,
-		Current_floor: 0,
-		Obstruction:   false,
-		Busy:          false,
-		Task_timer:    time.NewTimer(config.Request_timeout),
-	}
-	elev.Task_timer.Stop()
-	m.Client_list[c.Addr] = elev
-	log.Printf("Client connected: %s", c.Addr)
-}
-
-func (m *Master) Remove_client(addr string) {
-	_, ok := m.Client_list[addr]
-	if ok {
-		delete(m.Client_list, addr)
-		log.Printf("Client removed: %s", addr)
+		Resend_ticker:    time.NewTicker(config.Resend_rate),
 	}
 }
 
 func (m *Master) Send_light_update() {
 	for _, elev := range m.Client_list {
-		elev.Connection.Send(network.Message{Header: network.LightUpdate, Payload: &network.DataPayload{Lights: m.Hall_requests}})
-	}
-}
-
-func (m *Master) find_closest_elevator(floor int) string {
-	closest_addr := ""
-	shortest_dist := 9999
-
-	for _, client := range m.Client_list {
-		distance := utilities.Abs(client.Current_floor - floor)
-		if client.Busy {
-			distance += config.Busy_penalty
+		light := utilities.Create_request_arr(config.N_floors, config.N_buttons)
+		for f := 0; f < config.N_floors; f++ {
+			copy(light[f], m.Hall_requests[f])
+			light[f][elevio.BT_Cab] = m.Cab_requests[f][elev.ID]
 		}
-		if distance < shortest_dist {
-			closest_addr = client.Connection.Addr
-			shortest_dist = distance
-		}
-	}
-	return closest_addr
-}
-
-func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
-	if button == elevio.BT_Cab {
-		m.Client_list[addr].Busy = true
-		m.Client_list[addr].Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-		m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
-	} else {
-		client_addr := m.find_closest_elevator(floor)
-		if client_addr != "" {
-			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
-			m.Client_list[client_addr].Busy = true
-			m.Client_list[client_addr].Connection.Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-			m.Send_light_update()
-			m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
-		}
-	}
-}
-
-func (m *Master) Redistribute_request(id string) {
-	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if m.Hall_assignments[f][b] == id {
-				m.Distribute_request(f, b, "")
-			}
-		}
-	}
-}
-
-func (m *Master) Still_busy(addr string) bool {
-	for f := 0; f < config.N_floors; f++ {
-		if m.Cab_requests[f][m.Client_list[addr].ID] {
-			return false
-		}
-	}
-	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if m.Hall_assignments[f][b] == m.Client_list[addr].ID {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-func (m *Master) Client_timer_handler(timeout chan<- *network.Client) {
-	for {
-		for _, client := range m.Client_list {
-			if client.Task_timer != nil {
-				select {
-				case <-client.Task_timer.C:
-					client.Task_timer.Stop()
-					timeout <- client.Connection
-
-				default:
-
-				}
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
+		elev.Send(network.Message{Header: network.LightUpdate, Payload: &network.DataPayload{Lights: light}})
 	}
 }
