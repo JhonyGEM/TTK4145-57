@@ -1,4 +1,4 @@
-package mainFunctions
+package mainfunctions
 
 import (
 	"log"

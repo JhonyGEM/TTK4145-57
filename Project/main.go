@@ -6,7 +6,7 @@ import (
 	"project/config"
 	"project/elevator"
 	"project/elevio"
-	"project/mainFunctions"
+	"project/mainfunctions"
 	"project/master"
 	"project/network"
 	"project/utilities"
@@ -32,7 +32,7 @@ func main() {
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
-	backup := &mainFunctions.Backup{
+	backup := &mainfunctions.Backup{
 		BackupHallReg: utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		BackupCabReg:  master.Create_cab_requests(config.N_floors),
 	}
@@ -66,34 +66,34 @@ func main() {
 			for state == StateElevator {
 				select {
 				case floor := <-drv_floors:
-					mainFunctions.FloorHandler(floor, e)
+					mainfunctions.FloorHandler(floor, e)
 
 				case btn := <-drv_buttons:
-					mainFunctions.ButtonHandler(btn, prev_btn, e)
+					mainfunctions.ButtonHandler(btn, prev_btn, e)
 
 				case obs := <-drv_obstruction:
-					mainFunctions.ObstructionHandler(obs, e)
+					mainfunctions.ObstructionHandler(obs, e)
 
 				case <-e.Door_timer.C:
-					mainFunctions.DoorTimerHandler(e)
+					mainfunctions.DoorTimerHandler(e)
 
 				case <-lossChan:
-					mainFunctions.LossConnectionHandler(e)
+					mainfunctions.LossConnectionHandler(e)
 
 				case message := <-msgChan:
 					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
-						mainFunctions.OrderReceivedMessage(e, message)
+						mainfunctions.OrderReceivedMessage(e, message)
 
 					case network.LightUpdate:
 						e.Update_lights(message.Payload.Lights)
 
 					case network.Backup:
-						mainFunctions.BackupMessage(backup, e, message)
+						mainfunctions.BackupMessage(backup, e, message)
 
 					case network.Ack:
-						mainFunctions.ACKHandler(e, message)
+						mainfunctions.ACKHandler(e, message)
 
 					case network.Successor:
 						e.Successor = true
@@ -109,28 +109,24 @@ func main() {
 		case StateMaster:
 			log.Printf("Starting master \n")
 
-			mast := master.New_master()
-			mast.Cab_requests = backup.BackupCabReg
-			mast.Hall_requests = backup.BackupHallReg
+			m := master.New_master()
+			m.Cab_requests = backup.BackupCabReg
+			m.Hall_requests = backup.BackupHallReg
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.N_elevators*2)
 
 			go network.Start_server(lossChan, newChan, msgChan)
-			go mast.Client_timer_handler(lossChan)
+			go m.Client_timer_handler(lossChan)
 
 			for {
 				select {
 				case new := <-newChan:
-					mast.Add_client(new)
-					if len(mast.Client_list) == 1 {
-						mast.Successor_addr = new.Addr
-						mast.Client_list[new.Addr].Send(network.Message{Header: network.Successor})
-					}
+					mainfunctions.NewElevatorHandler(m, new)
 
 				case lost := <-lossChan:
-					mainFunctions.RemoveClient(mast, lost)
+					mainfunctions.RemoveClient(mast, lost)
 
 				case msg := <-msgChan:
 					log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
