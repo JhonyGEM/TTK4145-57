@@ -28,3 +28,11 @@ func BackupMessage(back *Backup, elevator *elevator.Elevator, message network.Me
 		UID:    message.UID,
 	})
 }
+
+func ACKHandler(elevator *elevator.Elevator, message network.Message) {
+	_, ok := elevator.Pending[message.UID]
+	if ok {
+		delete(elevator.Pending, message.UID)
+		elevator.Save_pending()
+	}
+}

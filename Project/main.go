@@ -28,7 +28,7 @@ const (
 func main() {
 	state := StateElevator
 
-	succesor := flag.Bool("succesor", false, "Succesor enable")
+	Successor := flag.Bool("Successor", false, "Successor enable")
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
@@ -44,7 +44,7 @@ func main() {
 
 			e := elevator.New_elevator(*id)
 			elevio.Init("localhost:15657", config.N_floors)
-			e.Succesor = *succesor
+			e.Successor = *Successor
 			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
 
 			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
@@ -93,15 +93,12 @@ func main() {
 						mainMessages.BackupMessage(backup, e, message)
 
 					case network.Ack:
-						_, ok := e.Pending[message.UID]
-						if ok {
-							delete(e.Pending, message.UID)
-							e.Save_pending()
-						}
+						mainMessages.ACKHandler(e, message)
 
-					case network.Succesor:
-						e.Succesor = true
+					case network.Successor:
+						e.Successor = true
 					}
+
 				case <-quitChan:
 					state = StateMaster
 					utilities.Start_new_instance(e.Id)
@@ -129,7 +126,7 @@ func main() {
 					mast.Add_client(new)
 					if len(mast.Client_list) == 1 {
 						mast.Successor_addr = new.Addr
-						mast.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
+						mast.Client_list[new.Addr].Send(network.Message{Header: network.Successor})
 					}
 
 				case lost := <-lossChan:

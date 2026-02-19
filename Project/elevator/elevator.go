@@ -24,7 +24,7 @@ type Elevator struct {
 	Obstruction   bool
 	Requests      [][]bool
 	Id            string
-	Succesor      bool
+	Successor     bool
 	//Network
 	Connection    *network.Client
 	Connected     bool
@@ -43,7 +43,7 @@ func New_elevator(id string) *Elevator {
 		Current_floor:   -1,
 		Requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Id:              id,
-		Succesor:        true,
+		Successor:       true,
 		Connected:       false,
 		Retry_counter:   0,
 		Pending:         make(map[string]*network.Message),

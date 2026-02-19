@@ -1,12 +1,12 @@
 package elevator
 
 import (
-	"project/config"
-	"project/network"
-	"project/elevio"
 	"encoding/json"
 	"log"
 	"os"
+	"project/config"
+	"project/elevio"
+	"project/network"
 )
 
 func (e *Elevator) Update_lights(request [][]bool) {
@@ -26,43 +26,43 @@ func (e *Elevator) Send(message network.Message) {
 func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}) {
 	for {
 		select {
-			case <-e.Reconnect_timer.C:
-				e.Retry_counter++
-				log.Printf("Retry counter: %d \n", e.Retry_counter)
-				e.Reconnect_timer.Stop()
+		case <-e.Reconnect_timer.C:
+			e.Retry_counter++
+			log.Printf("Retry counter: %d \n", e.Retry_counter)
+			e.Reconnect_timer.Stop()
 
-				if e.Retry_counter > config.Max_retries && e.Succesor {
-					close(quitChan)
-					return
-				}
+			if e.Retry_counter > config.Max_retries && e.Successor {
+				close(quitChan)
+				return
+			}
 
-				addr, err := network.Discover_server()
-				if err != nil {
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					continue
-				}
-				conn, err := network.Connect(addr)
-				if err != nil {
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					continue
-				}
+			addr, err := network.Discover_server()
+			if err != nil {
+				e.Reconnect_timer.Reset(config.Reconnect_delay)
+				continue
+			}
+			conn, err := network.Connect(addr)
+			if err != nil {
+				e.Reconnect_timer.Reset(config.Reconnect_delay)
+				continue
+			}
 
-				e.Retry_counter = 0 
-				e.Connection = network.New_client(conn)
-				e.Connected = true
-				e.Send(network.Message{Header: network.ClientInfo, 
-									   Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
-				go e.Connection.Listen(msgChan, lossChan)
-				go e.Connection.Heartbeat()
+			e.Retry_counter = 0
+			e.Connection = network.New_client(conn)
+			e.Connected = true
+			e.Send(network.Message{Header: network.ClientInfo,
+				Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
+			go e.Connection.Listen(msgChan, lossChan)
+			go e.Connection.Heartbeat()
 
-			case <-e.Pending_ticker.C:
-				if e.Connected {
-					if len(e.Pending) > 0 {
-						for _, message := range e.Pending {
-							e.Send(*message)
-						}
+		case <-e.Pending_ticker.C:
+			if e.Connected {
+				if len(e.Pending) > 0 {
+					for _, message := range e.Pending {
+						e.Send(*message)
 					}
 				}
+			}
 		}
 	}
 }
