@@ -1,9 +1,9 @@
 package elevator
 
 import (
-	"project/config"
-	"project/elevio"
-	"project/network"
+	"config"
+	"elevio"
+	"network"
 )
 
 func (e *Elevator) pending_request() bool {
@@ -75,25 +75,28 @@ func (e *Elevator) should_clear() bool {
 		(e.Requests[e.Current_floor][elevio.BT_Cab]))
 }
 
-func (e *Elevator) clear_request(floor int, button elevio.ButtonType) {
-	if !e.Requests[floor][button] {
-		return
-	}
-	e.Requests[floor][button] = false
-	if e.Connected {
-		e.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-	}
-}
-
 func (e *Elevator) clear_at_current_floor() {
-	e.clear_request(e.Current_floor, elevio.BT_Cab)
+	e.Requests[e.Current_floor][elevio.BT_Cab] = false
+	if e.Connected {
+		e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_Cab}})
+	}
 
-	if (e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
-		e.clear_request(e.Current_floor, elevio.BT_HallUp)
-	} else if (e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
-		e.clear_request(e.Current_floor, elevio.BT_HallDown)
+	if e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown]) {
+		e.Requests[e.Current_floor][elevio.BT_HallUp] = false
+		if e.Connected {
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
+		}
+	} else if e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown]) {
+		e.Requests[e.Current_floor][elevio.BT_HallDown] = false
+		if e.Connected {
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
+		}
 	} else {
-		e.clear_request(e.Current_floor, elevio.BT_HallUp)
-		e.clear_request(e.Current_floor, elevio.BT_HallDown)
+		e.Requests[e.Current_floor][elevio.BT_HallUp] = false
+		e.Requests[e.Current_floor][elevio.BT_HallDown] = false
+		if e.Connected {
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallUp}})
+			e.Connection.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.DataPayload{OrderFloor: e.Current_floor, OrderButton: elevio.BT_HallDown}})
+		}
 	}
 }

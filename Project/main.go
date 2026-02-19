@@ -1,14 +1,13 @@
 package main
 
 import (
-	"project/config"
-	"project/elevator"
-	"project/elevio"
-	"project/master"
-	"project/network"
-	"project/utilities"
-	"flag"
+	"config"
+	"elevator"
+	"elevio"
 	"log"
+	"master"
+	"network"
+	"utilities"
 )
 
 type PairState int
@@ -18,19 +17,8 @@ const (
 	StateMaster
 )
 
-// TODO: Problems
-
-
-// TODO: Need to do
-// 1. Imporve code quality
-// 2. Test if everyting thats implemented works
-
 func main() {
 	state := StateElevator
-
-	succesor := flag.Bool("succesor", false, "Succesor enable")
-	id := flag.String("id", "", "ID value")
-	flag.Parse()
 
 	backup_hall_reg := utilities.Create_request_arr(config.N_floors, config.N_buttons)
 	backup_cab_reg := master.Create_cab_requests(config.N_floors)
@@ -40,25 +28,27 @@ func main() {
 		case StateElevator:
 			log.Printf("Starting elevator \n")
 
-			e := elevator.New_elevator(*id)
+			// "Pop " is the id
+			e := elevator.New_elevator("pop")
+			// Change this hardcoded address
 			elevio.Init("localhost:15657", config.N_floors)
-			e.Succesor = *succesor
-			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
 
-			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
+			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
 			drv_floors := make(chan int)
 			drv_obstruction := make(chan bool)
 
 			lossChan := make(chan *network.Client)
 			msgChan := make(chan network.Message)
 			quitChan := make(chan struct{})
+			var prev_btn elevio.ButtonEvent
 
 			go elevio.PollButtons(drv_buttons, quitChan)
 			go elevio.PollFloorSensor(drv_floors, quitChan)
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan)
-			go e.Timer_handler(msgChan, lossChan, quitChan)
 
+			go e.Timer_handler(msgChan, lossChan, quitChan)
 			e.Load_pending()
+			log.Printf("Length: %d", len(e.Pending))
 			e.Step_FSM()
 
 			for state == StateElevator {
@@ -91,7 +81,7 @@ func main() {
 								UID: utilities.Gen_uid(e.Id),
 							}
 							e.Pending[message.UID] = &message
-							e.Send(message)
+							e.Connection.Send(message)
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
@@ -127,11 +117,12 @@ func main() {
 					e.Step_FSM()
 
 				case message := <-msgChan:
-					log.Printf("Recieved message with header: %v", message.Header)
+					log.Printf("Recieved message")
 					switch message.Header {
 					case network.OrderReceived:
 						e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 						e.Save_pending()
+						e.Update_lights(e.Requests)
 						e.Step_FSM()
 
 					case network.LightUpdate:
@@ -153,12 +144,10 @@ func main() {
 							e.Save_pending()
 						}
 
-					case network.Succesor:
-						e.Succesor = true
 					}
 				case <-quitChan:
 					state = StateMaster
-					utilities.Start_new_instance(e.Id)
+					utilities.Start_new_instance()
 					continue
 				}
 			}
@@ -179,12 +168,8 @@ func main() {
 
 			for {
 				select {
-					case new := <-newChan:
-						m.Add_client(new)
-						if len(m.Client_list) == 1 {
-							m.Successor_addr = new.Addr
-							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
-						}
+				case new := <-newChan:
+					addNewClient(mast, new)
 
 				case lost := <-lossChan:
 					removeClient(mast, lost)
@@ -196,71 +181,47 @@ func main() {
 						if msg.Payload.OrderButton == elevio.BT_Cab {
 							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
 						} else {
-							if lost.Addr == mast.Successor_addr {
-								for _, c := range mast.Client_list {
-									mast.Successor_addr = c.Connection.Addr
-									c.Send(network.Message{Header: network.Succesor})
-									break
-								}
-							}
-							mast.Redistribute_request(id)
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
+						}
+						mast.Client_list[mast.Successor_addr].Connection.Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
+						mast.Pending[msg.UID] = &msg
+
+					case network.OrderFulfilled:
+						if msg.Payload.OrderButton == elevio.BT_Cab {
+							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
+						} else {
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
+							mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
 						}
 
-					case msg := <-msgChan:
-						log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
-						switch msg.Header {
-						case network.OrderReceived:
-							if msg.Payload.OrderButton == elevio.BT_Cab {
-								mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
-							} else {
-								mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
-							}
-							mast.Client_list[mast.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
-							mast.Pending[msg.UID] = &msg
-
-						case network.OrderFulfilled:
-							if msg.Payload.OrderButton == elevio.BT_Cab {
-								mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
-							} else {
-								mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
-								mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
-							}
-							mast.Send_light_update()
-
-							if mast.Still_busy(msg.Address) {
-								mast.Client_list[msg.Address].Busy = false
-								mast.Client_list[msg.Address].Task_timer.Stop()
-							} else {
-								mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
-							}
-
-						case network.Ack:
-							message := mast.Pending[msg.UID]
-
-							_, ok := mast.Pending[msg.UID]
-							if ok {
-								mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-								mast.Client_list[message.Address].Send(network.Message{Header: network.Ack, UID: message.UID})
-								delete(mast.Pending, msg.UID)
-							}
-
-						case network.FloorUpdate:
-							mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-
-						case network.ObstructionUpdate:
-							mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
-
-						case network.ClientInfo:
-							mast.Client_list[msg.Address].ID = msg.Payload.ID
-							mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-							mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
-							mast.Resend_cab_request(msg.Address)
+						if mast.Still_busy(msg.Address) {
+							mast.Client_list[msg.Address].Busy = false
+							mast.Client_list[msg.Address].Task_timer.Stop()
+						} else {
+							mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
 						}
 
-					case <-mast.Resend_ticker.C:
-						if len(mast.Client_list) > 0 {
-							mast.Resend_hall_request() 
-						} 
+					case network.Ack:
+						message := mast.Pending[msg.UID]
+
+						_, ok := mast.Pending[msg.UID]
+						if ok {
+							mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
+							mast.Client_list[message.Address].Connection.Send(network.Message{Header: network.Ack, UID: message.UID})
+							delete(mast.Pending, msg.UID)
+						}
+
+					case network.FloorUpdate:
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+
+					case network.ObstructionUpdate:
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+
+					case network.ClientInfo:
+						mast.Client_list[msg.Address].ID = msg.Payload.ID
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+					}
 				}
 			}
 		}

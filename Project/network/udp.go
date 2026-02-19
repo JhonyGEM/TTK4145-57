@@ -1,9 +1,7 @@
 package network
 
 import (
-	"project/config"
-	"net"
-	"time"
+	"config"
 	"fmt"
 	"log"
 	"net"
@@ -25,7 +23,7 @@ func broadcast() {
 
 	for {
 		conn.Write([]byte("Hello"))
-		time.Sleep(config.Broadcast_rate)
+		time.Sleep(config.Broadcast_delay)
 	}
 }
 

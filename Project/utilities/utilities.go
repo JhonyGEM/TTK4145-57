@@ -18,10 +18,10 @@ func Create_request_arr(rows, cols int) [][]bool {
 	return q
 }
 
-func Start_new_instance(id string) {
+func Start_new_instance() {
 	switch runtime.GOOS {
 	case "windows":
-		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go", "-id=%s", id).Run()
+		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go").Run()
 	case "linux":
 		exec.Command("gnome-terminal", "--", "go", "run", "main.go").Run()
 	default:
