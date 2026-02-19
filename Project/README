@@ -1,2 +1,11 @@
 Project draft:
 https://docs.google.com/document/d/1hgmU3jSDxkgiLKJK7NLurnOSTiWwgaIDdkRZsH5kbrQ/edit?usp=sharing
+
+To run: go run main.go -id=pop -succesor
+
+
+# Communication redundancy
+each event (new reques) need an unique id
+when elevator recieves request it will send it to master and save it pending array until it gets ack, it will be resedn if no ack in certain time window
+master will recive the message, handle the event, send copy to sucsessor and wait for ack before sending request and ack to elevator
+      the pending array will be of type message and will be keyed by event id (time at the event was send + id of client)

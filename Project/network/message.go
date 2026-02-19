@@ -1,19 +1,21 @@
 package network
 
 import (
-	"elevio"
+	"project/elevio"
+	"fmt"
 )
 
 type HeaderType int
 
 const (
-	OrderReceived HeaderType = iota
-	OrderFulfilled
-	FloorUpdate
-	ObstructionUpdate
-	ClientInfo
-	Heartbeat
-	LightUpdate
+    OrderReceived HeaderType = iota
+    OrderFulfilled
+    FloorUpdate
+    ObstructionUpdate
+    ClientInfo
+	Succesor
+    Heartbeat
+    LightUpdate
 	Backup
 	Ack
 )
@@ -30,8 +32,35 @@ type DataPayload struct {
 }
 
 type Message struct {
-	Header  HeaderType   `json:"header"`
-	Payload *DataPayload `json:"payload,omitempty"`
-	Address string       `json:"address,omitempty"`
-	UID     string       `json:"uid,omitempty"`
+	Header  HeaderType      		`json:"header"`
+	Payload *DataPayload			`json:"payload,omitempty"`
+	Address string					`json:"address,omitempty"`
+	UID     string                  `json:"uid,omitempty"`
+}
+
+func (h HeaderType) String() string {
+	switch h {
+	case OrderReceived:
+		return "OrderReceived"
+	case OrderFulfilled:
+		return "OrderFulfilled"
+	case FloorUpdate:
+		return "FloorUpdate"
+	case ObstructionUpdate:
+		return "ObstructionUpdate"
+	case ClientInfo:
+		return "ClientInfo"
+	case Succesor:
+		return "Succesor"
+	case Heartbeat:
+		return "Heartbeat"
+	case LightUpdate:
+		return "LightUpdate"
+	case Backup:
+		return "Backup"
+	case Ack:
+		return "Ack"
+	default:
+		return fmt.Sprintf("HeaderType(%d)", int(h))
+	}
 }
