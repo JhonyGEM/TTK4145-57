@@ -66,28 +66,7 @@ func main() {
 					FloorHandler(floor, e)
 
 				case btn := <-drv_buttons:
-					if prev_btn != btn {
-						prev_btn = btn
-						if e.Connected {
-							message := network.Message{
-								Header: network.OrderReceived,
-								Payload: &network.DataPayload{
-									OrderFloor:  btn.Floor,
-									OrderButton: btn.Button,
-								},
-								UID: utilities.Gen_uid(e.Id),
-							}
-							e.Pending[message.UID] = &message
-							e.Send(message)
-						} else {
-							if btn.Button == elevio.BT_Cab {
-								e.Requests[btn.Floor][btn.Button] = true
-								e.Update_lights(e.Requests)
-								e.Step_FSM()
-							}
-						}
-					}
-
+					ButtonHandler(btn, prev_btn, e)
 				case obs := <-drv_obstruction:
 					e.Obstruction = obs
 					e.Step_FSM()
@@ -274,6 +253,30 @@ func FloorHandler(floor int, elevator *elevator.Elevator) {
 					CurrentFloor: elevator.Current_floor,
 				},
 			})
+		}
+	}
+}
+
+func ButtonHandler(button elevio.ButtonEvent, previousButton elevio.ButtonEvent, elevator *elevator.Elevator) {
+	if previousButton != button {
+		previousButton = button
+		if elevator.Connected {
+			message := network.Message{
+				Header: network.OrderReceived,
+				Payload: &network.DataPayload{
+					OrderFloor:  button.Floor,
+					OrderButton: button.Button,
+				},
+				UID: utilities.Gen_uid(elevator.Id),
+			}
+			elevator.Pending[message.UID] = &message
+			elevator.Send(message)
+		} else {
+			if button.Button == elevio.BT_Cab {
+				elevator.Requests[button.Floor][button.Button] = true
+				elevator.Update_lights(elevator.Requests)
+				elevator.Step_FSM()
+			}
 		}
 	}
 }
