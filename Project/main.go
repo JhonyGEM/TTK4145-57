@@ -67,22 +67,12 @@ func main() {
 
 				case btn := <-drv_buttons:
 					ButtonHandler(btn, prev_btn, e)
+
 				case obs := <-drv_obstruction:
-					e.Obstruction = obs
-					e.Step_FSM()
-					if e.Connected {
-						e.Connection.Send(network.Message{
-							Header: network.ObstructionUpdate,
-							Payload: &network.DataPayload{
-								Obstruction: e.Obstruction,
-							},
-						})
-					}
+					ObstructionHandler(obs, e)
 
 				case <-e.Door_timer.C:
-					e.Door_timer.Stop()
-					e.Door_timer_done = true
-					e.Step_FSM()
+					DoorTimerHandler(e)
 
 				case <-lossChan:
 					e.Connected = false
@@ -279,4 +269,23 @@ func ButtonHandler(button elevio.ButtonEvent, previousButton elevio.ButtonEvent,
 			}
 		}
 	}
+}
+
+func ObstructionHandler(obstruction bool, elevator *elevator.Elevator) {
+	elevator.Obstruction = obstruction
+	elevator.Step_FSM()
+	if elevator.Connected {
+		elevator.Connection.Send(network.Message{
+			Header: network.ObstructionUpdate,
+			Payload: &network.DataPayload{
+				Obstruction: elevator.Obstruction,
+			},
+		})
+	}
+}
+
+func DoorTimerHandler(elevator *elevator.Elevator) {
+	elevator.Door_timer.Stop()
+	elevator.Door_timer_done = true
+	elevator.Step_FSM()
 }
