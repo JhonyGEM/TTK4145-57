@@ -6,6 +6,7 @@ import (
 	"project/config"
 	"project/elevator"
 	"project/elevio"
+	mainMessages "project/main_functions"
 	"project/master"
 	"project/network"
 	"project/utilities"
@@ -31,8 +32,10 @@ func main() {
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
-	backup_hall_reg := utilities.Create_request_arr(config.N_floors, config.N_buttons)
-	backup_cab_reg := master.Create_cab_requests(config.N_floors)
+	backup := &mainMessages.Backup{
+		BackupHallReg: utilities.Create_request_arr(config.N_floors, config.N_buttons),
+		BackupCabReg:  master.Create_cab_requests(config.N_floors),
+	}
 
 	for {
 		switch state {
@@ -81,21 +84,13 @@ func main() {
 					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
-						e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
-						e.Save_pending()
-						e.Step_FSM()
+						mainMessages.OrderReceivedMessage(e, message)
 
 					case network.LightUpdate:
 						e.Update_lights(message.Payload.Lights)
 
 					case network.Backup:
-						log.Printf("Recieved backup")
-						backup_cab_reg = message.Payload.BackupCab
-						backup_hall_reg = message.Payload.BackupHall
-						e.Connection.Send(network.Message{
-							Header: network.Ack,
-							UID:    message.UID,
-						})
+						mainMessages.BackupMessage(backup, e, message)
 
 					case network.Ack:
 						_, ok := e.Pending[message.UID]
@@ -118,8 +113,8 @@ func main() {
 			log.Printf("Starting master \n")
 
 			mast := master.New_master()
-			mast.Cab_requests = backup_cab_reg
-			mast.Hall_requests = backup_hall_reg
+			mast.Cab_requests = backup.BackupCabReg
+			mast.Hall_requests = backup.BackupHallReg
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
