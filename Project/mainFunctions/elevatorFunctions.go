@@ -83,21 +83,3 @@ func AddNewClient(m *master.Master, conn *network.Client) {
 	}
 	m.Add_client(conn)
 }
-
-func RemoveClient(m *master.Master, conn *network.Client) {
-	id := m.Client_list[conn.Addr].ID
-	m.Remove_client(conn.Addr)
-
-	if len(m.Client_list) == 0 {
-		panic("Loss of connectivity")
-	} else {
-		if conn.Addr == m.Successor_addr {
-			for _, c := range m.Client_list {
-				m.Successor_addr = c.Connection.Addr
-				break
-			}
-		}
-
-		m.Redistribute_request(id)
-	}
-}

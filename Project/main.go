@@ -84,7 +84,7 @@ func main() {
 					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
-						mainfunctions.OrderReceivedMessage(e, message)
+						mainfunctions.ElevatorOrderReceivedMessage(e, message)
 
 					case network.LightUpdate:
 						e.Update_lights(message.Payload.Lights)
@@ -93,7 +93,7 @@ func main() {
 						mainfunctions.BackupMessage(backup, e, message)
 
 					case network.Ack:
-						mainfunctions.ACKHandler(e, message)
+						mainfunctions.ElevatorACKHandler(e, message)
 
 					case network.Successor:
 						e.Successor = true
@@ -123,66 +123,35 @@ func main() {
 			for {
 				select {
 				case new := <-newChan:
-					mainfunctions.NewElevatorHandler(m, new)
+					mainfunctions.AddElevatorHandler(m, new)
 
 				case lost := <-lossChan:
-					mainfunctions.RemoveClient(mast, lost)
+					mainfunctions.RemoveClient(m, lost)
 
 				case msg := <-msgChan:
 					log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
 					switch msg.Header {
 					case network.OrderReceived:
-						if msg.Payload.OrderButton == elevio.BT_Cab {
-							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
-						} else {
-							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
-						}
-						mast.Client_list[mast.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
-						mast.Pending[msg.UID] = &msg
+						mainfunctions.MasterOrderReceivedMessage(m, msg)
 
 					case network.OrderFulfilled:
-						if msg.Payload.OrderButton == elevio.BT_Cab {
-							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
-						} else {
-							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
-							mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
-						}
-						mast.Send_light_update()
-
-						if mast.Still_busy(msg.Address) {
-							mast.Client_list[msg.Address].Busy = false
-							mast.Client_list[msg.Address].Task_timer.Stop()
-						} else {
-							mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
-						}
+						mainfunctions.OrderFulfilledMessage(m, msg)
 
 					case network.Ack:
-						message := mast.Pending[msg.UID]
-
-						_, ok := mast.Pending[msg.UID]
-						if ok {
-							mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-							mast.Client_list[message.Address].Send(network.Message{Header: network.Ack, UID: message.UID})
-							delete(mast.Pending, msg.UID)
-						}
+						mainfunctions.MasterACKHandler(m, msg)
 
 					case network.FloorUpdate:
-						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+						m.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
 
 					case network.ObstructionUpdate:
-						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+						m.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
 
 					case network.ClientInfo:
-						mast.Client_list[msg.Address].ID = msg.Payload.ID
-						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
-						mast.Resend_cab_request(msg.Address)
+						mainfunctions.ClientInfoMessage(m, msg)
 					}
 
-				case <-mast.Resend_ticker.C:
-					if len(mast.Client_list) > 0 {
-						mast.Resend_hall_request()
-					}
+				case <-m.Resend_ticker.C:
+					mainfunctions.Resend(m)
 				}
 			}
 		}
