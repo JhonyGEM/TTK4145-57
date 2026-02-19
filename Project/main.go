@@ -6,7 +6,7 @@ import (
 	"project/config"
 	"project/elevator"
 	"project/elevio"
-	"project/mainfunctions"
+	mainFunctions "project/mainfunctions"
 	"project/master"
 	"project/network"
 	"project/utilities"
@@ -32,7 +32,7 @@ func main() {
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
-	backup := &mainfunctions.Backup{
+	backup := &mainFunctions.Backup{
 		BackupHallReg: utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		BackupCabReg:  master.Create_cab_requests(config.N_floors),
 	}
@@ -66,34 +66,34 @@ func main() {
 			for state == StateElevator {
 				select {
 				case floor := <-drv_floors:
-					mainfunctions.FloorHandler(floor, e)
+					mainFunctions.FloorHandler(floor, e)
 
 				case btn := <-drv_buttons:
-					mainfunctions.ButtonHandler(btn, prev_btn, e)
+					mainFunctions.ButtonHandler(btn, prev_btn, e)
 
 				case obs := <-drv_obstruction:
-					mainfunctions.ObstructionHandler(obs, e)
+					mainFunctions.ObstructionHandler(obs, e)
 
 				case <-e.Door_timer.C:
-					mainfunctions.DoorTimerHandler(e)
+					mainFunctions.DoorTimerHandler(e)
 
 				case <-lossChan:
-					mainfunctions.LossConnectionHandler(e)
+					mainFunctions.LossConnectionHandler(e)
 
 				case message := <-msgChan:
 					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
-						mainfunctions.ElevatorOrderReceivedMessage(e, message)
+						mainFunctions.ElevatorOrderReceivedMessage(e, message)
 
 					case network.LightUpdate:
 						e.Update_lights(message.Payload.Lights)
 
 					case network.Backup:
-						mainfunctions.BackupMessage(backup, e, message)
+						mainFunctions.BackupMessage(backup, e, message)
 
 					case network.Ack:
-						mainfunctions.ElevatorACKHandler(e, message)
+						mainFunctions.ElevatorACKHandler(e, message)
 
 					case network.Successor:
 						e.Successor = true
@@ -123,22 +123,22 @@ func main() {
 			for {
 				select {
 				case new := <-newChan:
-					mainfunctions.AddElevatorHandler(m, new)
+					mainFunctions.AddElevatorHandler(m, new)
 
 				case lost := <-lossChan:
-					mainfunctions.RemoveClient(m, lost)
+					mainFunctions.RemoveClient(m, lost)
 
 				case msg := <-msgChan:
 					log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
 					switch msg.Header {
 					case network.OrderReceived:
-						mainfunctions.MasterOrderReceivedMessage(m, msg)
+						mainFunctions.MasterOrderReceivedMessage(m, msg)
 
 					case network.OrderFulfilled:
-						mainfunctions.OrderFulfilledMessage(m, msg)
+						mainFunctions.OrderFulfilledMessage(m, msg)
 
 					case network.Ack:
-						mainfunctions.MasterACKHandler(m, msg)
+						mainFunctions.MasterACKHandler(m, msg)
 
 					case network.FloorUpdate:
 						m.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
@@ -147,11 +147,11 @@ func main() {
 						m.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
 
 					case network.ClientInfo:
-						mainfunctions.ClientInfoMessage(m, msg)
+						mainFunctions.ClientInfoMessage(m, msg)
 					}
 
 				case <-m.Resend_ticker.C:
-					mainfunctions.Resend(m)
+					mainFunctions.Resend(m)
 				}
 			}
 		}
