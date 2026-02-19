@@ -63,19 +63,7 @@ func main() {
 			for state == StateElevator {
 				select {
 				case floor := <-drv_floors:
-					if floor != -1 {
-						e.Current_floor = floor
-						elevio.SetFloorIndicator(floor)
-						e.Step_FSM()
-						if e.Connected {
-							e.Connection.Send(network.Message{
-								Header: network.FloorUpdate,
-								Payload: &network.DataPayload{
-									CurrentFloor: e.Current_floor,
-								},
-							})
-						}
-					}
+					FloorHandler(floor, e)
 
 				case btn := <-drv_buttons:
 					if prev_btn != btn {
@@ -271,5 +259,21 @@ func removeClient(m *master.Master, conn *network.Client) {
 		}
 
 		m.Redistribute_request(id)
+	}
+}
+
+func FloorHandler(floor int, elevator *elevator.Elevator) {
+	if floor != -1 {
+		elevator.Current_floor = floor
+		elevio.SetFloorIndicator(floor)
+		elevator.Step_FSM()
+		if elevator.Connected {
+			elevator.Connection.Send(network.Message{
+				Header: network.FloorUpdate,
+				Payload: &network.DataPayload{
+					CurrentFloor: elevator.Current_floor,
+				},
+			})
+		}
 	}
 }
