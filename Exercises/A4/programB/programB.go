@@ -5,6 +5,7 @@ import (
 	Connect "A4/connectivity"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -51,12 +52,20 @@ func StartProgramB(readPort int) {
 func CreateNewProgram(value int) error {
 	// Open a new window in Windows
 	var cmd *exec.Cmd
-	if value == 0 {
-		cmd = exec.Command("cmd", "/C", "start", "powershell", "-NoExit", "go", "run", "programA/programA.go")
-	} else {
-		cmd = exec.Command("cmd", "/C", "start", "powershell", "-NoExit", "go", "run", "programA/programA.go", fmt.Sprint(value))
+	switch runtime.GOOS {
+	case "windows":
+		if value == 0 {
+			cmd = exec.Command("cmd", "/C", "start", "powershell", "-NoExit", "go", "run", "programA/programA.go")
+		} else {
+			cmd = exec.Command("cmd", "/C", "start", "powershell", "-NoExit", "go", "run", "programA/programA.go", fmt.Sprint(value))
+		}
+	case "linux":
+		if value == 0 {
+			cmd = exec.Command("gnome-terminal", "--", "go", "run", "programA/programA.go")
+		} else {
+			cmd = exec.Command("gnome-terminal", "--", "go", "run", "programA/programA.go", fmt.Sprint(value))
+		}
 	}
-
 	err := cmd.Start()
 
 	if err != nil {
@@ -65,4 +74,5 @@ func CreateNewProgram(value int) error {
 	}
 
 	return nil
+
 }
