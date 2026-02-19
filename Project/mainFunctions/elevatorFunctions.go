@@ -9,6 +9,8 @@ import (
 	"project/utilities"
 )
 
+// This code represents all the functions done in the main within the StateElevator case
+
 func FloorHandler(floor int, elevator *elevator.Elevator) {
 	if floor != -1 {
 		elevator.Current_floor = floor

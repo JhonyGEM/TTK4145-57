@@ -9,10 +9,16 @@ import (
 	"project/network"
 )
 
+// // This code represents all the functions done in the message switch within the both StateElevator and StateMaster cases
+
 type Backup struct {
 	BackupHallReg [][]bool
 	BackupCabReg  []map[string]bool
 }
+
+/*
+---------------------------------	ELEVATOR	-----------------------------------------
+*/
 
 func ElevatorOrderReceivedMessage(elevator *elevator.Elevator, message network.Message) {
 	elevator.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
@@ -39,6 +45,10 @@ func ElevatorACKHandler(elevator *elevator.Elevator, message network.Message) {
 		elevator.Save_pending()
 	}
 }
+
+/*
+---------------------------------	MASTER	-----------------------------------------
+*/
 
 func MasterOrderReceivedMessage(mast *master.Master, msg network.Message) {
 	if msg.Payload.OrderButton == elevio.BT_Cab {

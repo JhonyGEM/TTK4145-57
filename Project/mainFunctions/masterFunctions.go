@@ -5,6 +5,8 @@ import (
 	"project/network"
 )
 
+// This code represents all the functions done in the main within the StateMaster case
+
 func AddElevatorHandler(master *master.Master, newElevator *network.Client) {
 	master.Add_client(newElevator)
 	if len(master.Client_list) == 1 {
@@ -23,8 +25,10 @@ func RemoveClient(m *master.Master, conn *network.Client) {
 	if len(m.Client_list) == 0 {
 		panic("Loss of connectivity")
 	} else {
+		// If the one lost is the successor
 		if conn.Addr == m.Successor_addr {
 			for _, c := range m.Client_list {
+				// Select the first in the list
 				m.Successor_addr = c.Connection.Addr
 				break
 			}
