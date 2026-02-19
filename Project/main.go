@@ -75,12 +75,7 @@ func main() {
 					DoorTimerHandler(e)
 
 				case <-lossChan:
-					e.Connected = false
-					e.Connection = &network.Client{}
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					e.Remove_hall_requests()
-					e.Update_state(elevator.Undefined)
-					e.Step_FSM()
+					LossConnectionHandler(e)
 
 				case message := <-msgChan:
 					log.Printf("Recieved message with header: %v", message.Header)
@@ -288,4 +283,13 @@ func DoorTimerHandler(elevator *elevator.Elevator) {
 	elevator.Door_timer.Stop()
 	elevator.Door_timer_done = true
 	elevator.Step_FSM()
+}
+
+func LossConnectionHandler(elev *elevator.Elevator) {
+	elev.Connected = false
+	elev.Connection = &network.Client{}
+	elev.Reconnect_timer.Reset(config.Reconnect_delay)
+	elev.Remove_hall_requests()
+	elev.Update_state(elevator.Undefined)
+	elev.Step_FSM()
 }
