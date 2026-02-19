@@ -6,7 +6,7 @@ import (
 	"project/config"
 	"project/elevator"
 	"project/elevio"
-	mainMessages "project/main_functions"
+	"project/mainFunctions"
 	"project/master"
 	"project/network"
 	"project/utilities"
@@ -32,7 +32,7 @@ func main() {
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
-	backup := &mainMessages.Backup{
+	backup := &mainFunctions.Backup{
 		BackupHallReg: utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		BackupCabReg:  master.Create_cab_requests(config.N_floors),
 	}
@@ -66,34 +66,34 @@ func main() {
 			for state == StateElevator {
 				select {
 				case floor := <-drv_floors:
-					FloorHandler(floor, e)
+					mainFunctions.FloorHandler(floor, e)
 
 				case btn := <-drv_buttons:
-					ButtonHandler(btn, prev_btn, e)
+					mainFunctions.ButtonHandler(btn, prev_btn, e)
 
 				case obs := <-drv_obstruction:
-					ObstructionHandler(obs, e)
+					mainFunctions.ObstructionHandler(obs, e)
 
 				case <-e.Door_timer.C:
-					DoorTimerHandler(e)
+					mainFunctions.DoorTimerHandler(e)
 
 				case <-lossChan:
-					LossConnectionHandler(e)
+					mainFunctions.LossConnectionHandler(e)
 
 				case message := <-msgChan:
 					log.Printf("Recieved message with header: %v", message.Header)
 					switch message.Header {
 					case network.OrderReceived:
-						mainMessages.OrderReceivedMessage(e, message)
+						mainFunctions.OrderReceivedMessage(e, message)
 
 					case network.LightUpdate:
 						e.Update_lights(message.Payload.Lights)
 
 					case network.Backup:
-						mainMessages.BackupMessage(backup, e, message)
+						mainFunctions.BackupMessage(backup, e, message)
 
 					case network.Ack:
-						mainMessages.ACKHandler(e, message)
+						mainFunctions.ACKHandler(e, message)
 
 					case network.Successor:
 						e.Successor = true
@@ -130,7 +130,7 @@ func main() {
 					}
 
 				case lost := <-lossChan:
-					removeClient(mast, lost)
+					mainFunctions.RemoveClient(mast, lost)
 
 				case msg := <-msgChan:
 					log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
@@ -191,97 +191,4 @@ func main() {
 			}
 		}
 	}
-}
-
-func addNewClient(m *master.Master, conn *network.Client) {
-	if len(m.Client_list) == 0 {
-		m.Successor_addr = conn.Addr
-	}
-	m.Add_client(conn)
-}
-
-func removeClient(m *master.Master, conn *network.Client) {
-	id := m.Client_list[conn.Addr].ID
-	m.Remove_client(conn.Addr)
-
-	if len(m.Client_list) == 0 {
-		panic("Loss of connectivity")
-	} else {
-		if conn.Addr == m.Successor_addr {
-			for _, c := range m.Client_list {
-				m.Successor_addr = c.Connection.Addr
-				break
-			}
-		}
-
-		m.Redistribute_request(id)
-	}
-}
-
-func FloorHandler(floor int, elevator *elevator.Elevator) {
-	if floor != -1 {
-		elevator.Current_floor = floor
-		elevio.SetFloorIndicator(floor)
-		elevator.Step_FSM()
-		if elevator.Connected {
-			elevator.Connection.Send(network.Message{
-				Header: network.FloorUpdate,
-				Payload: &network.DataPayload{
-					CurrentFloor: elevator.Current_floor,
-				},
-			})
-		}
-	}
-}
-
-func ButtonHandler(button elevio.ButtonEvent, previousButton elevio.ButtonEvent, elevator *elevator.Elevator) {
-	if previousButton != button {
-		previousButton = button
-		if elevator.Connected {
-			message := network.Message{
-				Header: network.OrderReceived,
-				Payload: &network.DataPayload{
-					OrderFloor:  button.Floor,
-					OrderButton: button.Button,
-				},
-				UID: utilities.Gen_uid(elevator.Id),
-			}
-			elevator.Pending[message.UID] = &message
-			elevator.Send(message)
-		} else {
-			if button.Button == elevio.BT_Cab {
-				elevator.Requests[button.Floor][button.Button] = true
-				elevator.Update_lights(elevator.Requests)
-				elevator.Step_FSM()
-			}
-		}
-	}
-}
-
-func ObstructionHandler(obstruction bool, elevator *elevator.Elevator) {
-	elevator.Obstruction = obstruction
-	elevator.Step_FSM()
-	if elevator.Connected {
-		elevator.Connection.Send(network.Message{
-			Header: network.ObstructionUpdate,
-			Payload: &network.DataPayload{
-				Obstruction: elevator.Obstruction,
-			},
-		})
-	}
-}
-
-func DoorTimerHandler(elevator *elevator.Elevator) {
-	elevator.Door_timer.Stop()
-	elevator.Door_timer_done = true
-	elevator.Step_FSM()
-}
-
-func LossConnectionHandler(elev *elevator.Elevator) {
-	elev.Connected = false
-	elev.Connection = &network.Client{}
-	elev.Reconnect_timer.Reset(config.Reconnect_delay)
-	elev.Remove_hall_requests()
-	elev.Update_state(elevator.Undefined)
-	elev.Step_FSM()
 }

@@ -1,4 +1,4 @@
-package mainMessages
+package mainFunctions
 
 import (
 	"log"
