@@ -1,14 +1,14 @@
 package main
 
 import (
+	"flag"
+	"log"
 	"project/config"
 	"project/elevator"
 	"project/elevio"
 	"project/master"
 	"project/network"
 	"project/utilities"
-	"flag"
-	"log"
 )
 
 type PairState int
@@ -19,7 +19,6 @@ const (
 )
 
 // TODO: Problems
-
 
 // TODO: Need to do
 // 1. Imporve code quality
@@ -45,7 +44,7 @@ func main() {
 			e.Succesor = *succesor
 			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
 
-			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
+			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
 			drv_floors := make(chan int)
 			drv_obstruction := make(chan bool)
 
@@ -179,88 +178,71 @@ func main() {
 
 			for {
 				select {
-					case new := <-newChan:
-						m.Add_client(new)
-						if len(m.Client_list) == 1 {
-							m.Successor_addr = new.Addr
-							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
-						}
+				case new := <-newChan:
+					mast.Add_client(new)
+					if len(mast.Client_list) == 1 {
+						mast.Successor_addr = new.Addr
+						mast.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
+					}
 
 				case lost := <-lossChan:
 					removeClient(mast, lost)
 
 				case msg := <-msgChan:
-					log.Printf("Recived message from %s with header: %d", msg.Address, msg.Header)
+					log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
 					switch msg.Header {
 					case network.OrderReceived:
 						if msg.Payload.OrderButton == elevio.BT_Cab {
 							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
 						} else {
-							if lost.Addr == mast.Successor_addr {
-								for _, c := range mast.Client_list {
-									mast.Successor_addr = c.Connection.Addr
-									c.Send(network.Message{Header: network.Succesor})
-									break
-								}
-							}
-							mast.Redistribute_request(id)
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
+						}
+						mast.Client_list[mast.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
+						mast.Pending[msg.UID] = &msg
+
+					case network.OrderFulfilled:
+						if msg.Payload.OrderButton == elevio.BT_Cab {
+							mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
+						} else {
+							mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
+							mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
+						}
+						mast.Send_light_update()
+
+						if mast.Still_busy(msg.Address) {
+							mast.Client_list[msg.Address].Busy = false
+							mast.Client_list[msg.Address].Task_timer.Stop()
+						} else {
+							mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
 						}
 
-					case msg := <-msgChan:
-						log.Printf("Recived message from %s with header: %v", msg.Address, msg.Header)
-						switch msg.Header {
-						case network.OrderReceived:
-							if msg.Payload.OrderButton == elevio.BT_Cab {
-								mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = true
-							} else {
-								mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = true
-							}
-							mast.Client_list[mast.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.DataPayload{BackupHall: mast.Hall_requests, BackupCab: mast.Cab_requests}, UID: msg.UID})
-							mast.Pending[msg.UID] = &msg
+					case network.Ack:
+						message := mast.Pending[msg.UID]
 
-						case network.OrderFulfilled:
-							if msg.Payload.OrderButton == elevio.BT_Cab {
-								mast.Cab_requests[msg.Payload.OrderFloor][mast.Client_list[msg.Address].ID] = false
-							} else {
-								mast.Hall_requests[msg.Payload.OrderFloor][msg.Payload.OrderButton] = false
-								mast.Hall_assignments[msg.Payload.OrderFloor][msg.Payload.OrderButton] = ""
-							}
-							mast.Send_light_update()
-
-							if mast.Still_busy(msg.Address) {
-								mast.Client_list[msg.Address].Busy = false
-								mast.Client_list[msg.Address].Task_timer.Stop()
-							} else {
-								mast.Client_list[msg.Address].Task_timer.Reset(config.Request_timeout)
-							}
-
-						case network.Ack:
-							message := mast.Pending[msg.UID]
-
-							_, ok := mast.Pending[msg.UID]
-							if ok {
-								mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
-								mast.Client_list[message.Address].Send(network.Message{Header: network.Ack, UID: message.UID})
-								delete(mast.Pending, msg.UID)
-							}
-
-						case network.FloorUpdate:
-							mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-
-						case network.ObstructionUpdate:
-							mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
-
-						case network.ClientInfo:
-							mast.Client_list[msg.Address].ID = msg.Payload.ID
-							mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
-							mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
-							mast.Resend_cab_request(msg.Address)
+						_, ok := mast.Pending[msg.UID]
+						if ok {
+							mast.Distribute_request(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address)
+							mast.Client_list[message.Address].Send(network.Message{Header: network.Ack, UID: message.UID})
+							delete(mast.Pending, msg.UID)
 						}
 
-					case <-mast.Resend_ticker.C:
-						if len(mast.Client_list) > 0 {
-							mast.Resend_hall_request() 
-						} 
+					case network.FloorUpdate:
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+
+					case network.ObstructionUpdate:
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+
+					case network.ClientInfo:
+						mast.Client_list[msg.Address].ID = msg.Payload.ID
+						mast.Client_list[msg.Address].Current_floor = msg.Payload.CurrentFloor
+						mast.Client_list[msg.Address].Obstruction = msg.Payload.Obstruction
+						mast.Resend_cab_request(msg.Address)
+					}
+
+				case <-mast.Resend_ticker.C:
+					if len(mast.Client_list) > 0 {
+						mast.Resend_hall_request()
+					}
 				}
 			}
 		}
