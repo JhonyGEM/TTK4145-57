@@ -27,3 +27,6 @@ const Busy_penalty = 		5
 const Max_retries = 		1
 const Request_timeout = 	N_floors * 4 * time.Second
 const Resend_rate =         30 * time.Second
+
+// Debugging
+const Cell_width =          8

@@ -6,7 +6,6 @@ import (
 	"project/network"
 	"project/utilities"
 	"time"
-	"log"
 )
 
 type Backup struct {
@@ -68,7 +67,7 @@ func New_master() *Master {
 }
 
 func (m *Master) Handle_message(message network.Message) {
-	log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
+	//log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
 	switch message.Header {
 	case network.OrderReceived:
 		if message.Payload.OrderButton == elevio.BT_Cab {
@@ -133,4 +132,6 @@ func (m *Master) Handle_message(message network.Message) {
 		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
 		m.Resend_cab_request(message.Address)
 	}
+	m.Print_hall_request()
+	m.Print_cab_request()
 }

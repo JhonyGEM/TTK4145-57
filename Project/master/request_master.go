@@ -47,7 +47,7 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 
 func (m *Master) Redistribute_hall_request(id string) {
 	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < elevio.ButtonType(1); b++ {
+		for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 			if m.Hall_assignments[f][b] == id {
 				m.Distribute_request(f, b, "")
 			}
@@ -66,7 +66,7 @@ func (m *Master) Resend_cab_request(addr string) {
 
 func (m *Master) Resend_hall_request() {
 	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < elevio.ButtonType(1); b++ {
+		for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 			if m.Hall_requests[f][b] && m.Hall_assignments[f][b] == "" {
 				m.Distribute_request(f, b, "")
 			}
