@@ -27,7 +27,8 @@ func (m *Master) find_closest_elevator(floor int) string {
 func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
 	if button == elevio.BT_Cab {
 		m.Client_list[addr].Active_req++
-		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, 
+												 Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 		if !m.Client_list[addr].Obstruction {
 			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
 		}
@@ -36,7 +37,8 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 		if client_addr != "" {
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
 			m.Client_list[client_addr].Active_req++
-			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, 
+															Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 			if !m.Client_list[client_addr].Obstruction {
 				m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
 			}
@@ -81,6 +83,7 @@ func (m *Master) Send_light_update() {
 			copy(light[f], m.Hall_requests[f])
 			light[f][elevio.BT_Cab] = m.Cab_requests[f][elev.ID]
 		}
-		elev.Send(network.Message{Header: network.LightUpdate, Payload: &network.MessagePayload{Lights: light}})
+		elev.Send(network.Message{Header: network.LightUpdate, 
+								  Payload: &network.MessagePayload{Lights: light}})
 	}
 }

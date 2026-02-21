@@ -20,12 +20,12 @@ const (
 )
 
 // TODO: Problems
-// When a lot of request comes in in short succession, then some requests are not distributed. Hall orders are handled by ticker but cab order are ignored
 
 
 // TODO: Need to do
 // 1. Imporve code quality
 // 2. Test if everyting thats implemented works
+// 3. Improve find_closest_elevator
 
 func main() {
 	state := StateElevator
@@ -81,7 +81,8 @@ func main() {
 					if prev_btn != btn {
 						prev_btn = btn
 						if e.Connected {
-							message := network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, UID: utilities.Gen_uid(e.Id)}
+							message := network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, UID: utilities.Gen_uid(e.Id, e.Sequence)}
+							e.Sequence++
 							e.Pending[message.UID] = &message
 							e.Send(message)
 						} else {

@@ -36,6 +36,6 @@ func Abs(x int) int {
 	return x
 }
 
-func Gen_uid(client_id string) string {
-	return fmt.Sprintf("%s-%d", client_id, time.Now().UnixNano())
+func Gen_uid(client_id string, sequence int) string {
+	return fmt.Sprintf("%s-%d-%d", client_id, sequence, time.Now().UnixNano())
 }

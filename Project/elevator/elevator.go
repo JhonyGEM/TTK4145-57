@@ -31,6 +31,7 @@ type Elevator struct {
 	Connection      *network.Client
 	Connected       bool
 	Retry_counter   int
+	Sequence        int
 	Pending         map[string]*network.Message
 	//Timers
 	Door_timer      *time.Timer
@@ -48,6 +49,7 @@ func New_elevator(id string) *Elevator {
 		Succesor:        true,
 		Connected:       false,
 		Retry_counter:   0,
+		Sequence:        0,
 		Pending:         make(map[string]*network.Message),
 		Door_timer:      time.NewTimer(config.Open_duration),
 		Reconnect_timer: time.NewTimer(config.Reconnect_delay),

@@ -81,7 +81,8 @@ func (e *Elevator) clear_request(floor int, button elevio.ButtonType) {
 	}
 	e.Requests[floor][button] = false
 	if e.Connected {
-		e.Send(network.Message{Header: network.OrderFulfilled, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+		e.Send(network.Message{Header: network.OrderFulfilled, 
+							   Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 	}
 }
 

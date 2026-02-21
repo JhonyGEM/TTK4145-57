@@ -6,6 +6,7 @@ import (
 	"project/network"
 	"project/utilities"
 	"time"
+	"fmt"
 )
 
 type Backup struct {
@@ -26,6 +27,7 @@ type Master struct {
 	Hall_assignments     [][]string
 	Cab_requests         []map[string]bool
 	Successor_addr       string
+	Sequence             int
 	Pending              map[string]*network.Message
 	Resend_ticker        *time.Ticker
 }
@@ -61,6 +63,7 @@ func New_master() *Master {
 		Hall_requests:    utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Hall_assignments: create_hall_assignment_arr(config.N_floors, config.N_buttons),
 		Cab_requests:     Create_cab_request_arr(config.N_floors),
+		Sequence:		  0,
 		Pending:          make(map[string]*network.Message),
 		Resend_ticker:    time.NewTicker(config.Resend_rate),
 	}
@@ -75,7 +78,9 @@ func (m *Master) Handle_message(message network.Message) {
 		} else {
 			m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 		}
-		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, UID: message.UID})
+		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
+															 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+															 UID: message.UID})
 		m.Pending[message.UID] = &message
 
 	case network.OrderFulfilled:
@@ -93,8 +98,11 @@ func (m *Master) Handle_message(message network.Message) {
 			m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
 		}
 
-		message.UID = utilities.Gen_uid(m.Client_list[m.Successor_addr].ID)
-		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, UID: message.UID})
+		message.UID = utilities.Gen_uid(m.Client_list[m.Successor_addr].ID, m.Sequence)
+		m.Sequence++
+		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
+															 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+															 UID: message.UID})
 		m.Pending[message.UID] = &message
 
 	case network.Ack:
@@ -104,7 +112,8 @@ func (m *Master) Handle_message(message network.Message) {
 			switch pend_msg.Header {
 			case network.OrderReceived:
 				m.Distribute_request(pend_msg.Payload.OrderFloor, pend_msg.Payload.OrderButton, pend_msg.Address)
-				m.Client_list[pend_msg.Address].Send(network.Message{Header: network.Ack, UID: pend_msg.UID})
+				m.Client_list[pend_msg.Address].Send(network.Message{Header: network.Ack, 
+																	 UID: pend_msg.UID})
 				delete(m.Pending, pend_msg.UID)
 
 			case network.OrderFulfilled:
@@ -132,7 +141,8 @@ func (m *Master) Handle_message(message network.Message) {
 		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
 		m.Resend_cab_request(message.Address)
 	}
-	//m.Print_hall_request()
+	m.Print_hall_request()
 	//m.Print_cab_request()
-	m.Print_client_list()
+	//m.Print_client_list()
+	fmt.Printf("Pending len: %d \n", len(m.Pending))
 }

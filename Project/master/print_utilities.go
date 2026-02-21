@@ -22,7 +22,7 @@ func (m *Master) Print_hall_request() {
 				continue
 			}
 			if !m.Hall_requests[f][b] {
-				fmt.Printf("| %-*s", config.Cell_width, "_")
+				fmt.Printf("| %-*s", config.Cell_width, "-")
 			} else if m.Hall_assignments[f][b] == "" {
 				fmt.Printf("| %-*s", config.Cell_width, "*")
 			} else {
@@ -42,7 +42,7 @@ func (m *Master) Print_cab_request() {
 			if m.Cab_requests[f][client.ID] {
 				fmt.Printf("| %-*s", config.Cell_width, client.ID)
 			} else {
-				fmt.Printf("| %-*s", config.Cell_width, "_")
+				fmt.Printf("| %-*s", config.Cell_width, "-")
 			}
 		}
 		fmt.Println("|")
