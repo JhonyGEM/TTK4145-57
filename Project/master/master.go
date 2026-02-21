@@ -9,14 +9,14 @@ import (
 )
 
 type Backup struct {
-	Hall_reg [][]bool
-	Cab_reg  []map[string]bool
+	Hall_req [][]bool
+	Cab_req  []map[string]bool
 }
 
 func New_backup() *Backup {
 	return &Backup{
-		Hall_reg: utilities.Create_request_arr(config.N_floors, config.N_buttons),
-		Cab_reg:  Create_cab_request_arr(config.N_floors),
+		Hall_req: utilities.Create_request_arr(config.N_floors, config.N_buttons),
+		Cab_req:  Create_cab_request_arr(config.N_floors),
 	}
 }
 
@@ -35,7 +35,7 @@ type Elevator_client struct {
 	ID 				string
 	Current_floor 	int
 	Obstruction 	bool
-	Busy 			bool
+	Active_req      int
 	Task_timer 		*time.Timer
 }
 
@@ -85,9 +85,9 @@ func (m *Master) Handle_message(message network.Message) {
 			m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = false
 			m.Hall_assignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
 		}
+		m.Client_list[message.Address].Active_req--
 		
-		if m.Still_busy(message.Address) {
-			m.Client_list[message.Address].Busy = false
+		if m.Client_list[message.Address].Active_req == 0 {
 			m.Client_list[message.Address].Task_timer.Stop()
 		} else {
 			m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
@@ -121,7 +121,7 @@ func (m *Master) Handle_message(message network.Message) {
 		if message.Payload.Obstruction {
 			m.Client_list[message.Address].Task_timer.Stop()
 		} else {
-			if m.Client_list[message.Address].Busy {
+			if m.Client_list[message.Address].Active_req > 0 {
 				m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
 			}
 		}
@@ -132,6 +132,7 @@ func (m *Master) Handle_message(message network.Message) {
 		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
 		m.Resend_cab_request(message.Address)
 	}
-	m.Print_hall_request()
-	m.Print_cab_request()
+	//m.Print_hall_request()
+	//m.Print_cab_request()
+	m.Print_client_list()
 }

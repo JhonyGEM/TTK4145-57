@@ -13,8 +13,8 @@ func (m *Master) find_closest_elevator(floor int) string {
 
 	for _, client := range m.Client_list {
 		distance := utilities.Abs(client.Current_floor - floor)
-		if client.Busy {
-			distance += config.Busy_penalty
+		if client.Active_req > 0 {
+			distance += config.Busy_penalty * client.Active_req
 		}
 		if distance < shortest_dist {
 			closest_addr = client.Connection.Addr
@@ -26,7 +26,7 @@ func (m *Master) find_closest_elevator(floor int) string {
 
 func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
 	if button == elevio.BT_Cab {
-		m.Client_list[addr].Busy = true
+		m.Client_list[addr].Active_req++
 		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 		if !m.Client_list[addr].Obstruction {
 			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
@@ -35,7 +35,7 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 		client_addr := m.find_closest_elevator(floor)
 		if client_addr != "" {
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
-			m.Client_list[client_addr].Busy = true
+			m.Client_list[client_addr].Active_req++
 			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 			if !m.Client_list[client_addr].Obstruction {
 				m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
@@ -72,23 +72,6 @@ func (m *Master) Resend_hall_request() {
 			}
 		}
 	}
-}
-
-// Check if client still have assigned requests
-func (m *Master) Still_busy(addr string) bool {
-	for f := 0; f < config.N_floors; f++ {
-		if m.Cab_requests[f][m.Client_list[addr].ID] {
-			return false
-		}	
-	}
-	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if m.Hall_assignments[f][b] == m.Client_list[addr].ID {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func (m *Master) Send_light_update() {

@@ -18,7 +18,7 @@ func (m *Master) Add_client(c *network.Client) {
 		Connection:    c,
 		Current_floor: 0,
 		Obstruction:   false,
-		Busy:          false,
+		Active_req:    0,
 		Task_timer:    time.NewTimer(config.Request_timeout),
 	}
 	elev.Task_timer.Stop()

@@ -20,12 +20,12 @@ const (
 )
 
 // TODO: Problems
+// When a lot of request comes in in short succession, then some requests are not distributed. Hall orders are handled by ticker but cab order are ignored
 
 
 // TODO: Need to do
 // 1. Imporve code quality
 // 2. Test if everyting thats implemented works
-// 3. Improve debugging print
 
 func main() {
 	state := StateElevator
@@ -128,8 +128,8 @@ func main() {
 			log.Printf("Starting master \n")
 
 			m := master.New_master()
-			m.Cab_requests = b.Cab_reg
-			m.Hall_requests = b.Hall_reg
+			m.Cab_requests = b.Cab_req
+			m.Hall_requests = b.Hall_req
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)

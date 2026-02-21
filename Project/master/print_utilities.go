@@ -53,10 +53,10 @@ func (m *Master) Print_cab_request() {
 func (m *Master) Print_client_list() {
 	fmt.Print("Client list \n")
 	print_separator()
-	fmt.Printf("| %-*s| %-*s| %-*s| %-*s|\n", config.Cell_width, "ID", config.Cell_width, "Floor", config.Cell_width, "Obst", config.Cell_width, "Busy")
+	fmt.Printf("| %-*s| %-*s| %-*s| %-*s|\n", config.Cell_width, "ID", config.Cell_width, "Floor", config.Cell_width, "Obst", config.Cell_width, "AR")
 	print_separator()
 	for _, client := range m.Client_list {
-		fmt.Printf("| %-*s| %-*d| %-*t| %-*t|\n", config.Cell_width, client.ID, config.Cell_width, client.Current_floor, config.Cell_width, client.Obstruction, config.Cell_width, client.Busy)
+		fmt.Printf("| %-*s| %-*d| %-*t| %-*d|\n", config.Cell_width, client.ID, config.Cell_width, client.Current_floor, config.Cell_width, client.Obstruction, config.Cell_width, client.Active_req)
 	}
 	print_separator()
 }

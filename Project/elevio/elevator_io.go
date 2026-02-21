@@ -4,7 +4,6 @@ import "time"
 import "sync"
 import "net"
 import "fmt"
-import "log"
 
 
 
@@ -203,11 +202,11 @@ func read(in [4]byte) [4]byte {
 	defer _mtx.Unlock()
 	
 	_, err := _conn.Write(in[:])
-	if err != nil { log.Printf("Lost connection to Elevator Server") }
+	if err != nil { panic("Lost connection to Elevator Server") }
 	
 	var out [4]byte
 	_, err = _conn.Read(out[:])
-	if err != nil { log.Printf("Lost connection to Elevator Server") }
+	if err != nil { panic("Lost connection to Elevator Server") }
 	
 	return out
 }
@@ -217,7 +216,7 @@ func write(in [4]byte) {
 	defer _mtx.Unlock()
 	
 	_, err := _conn.Write(in[:])
-	if err != nil { log.Printf("Lost connection to Elevator Server") }
+	if err != nil { panic("Lost connection to Elevator Server") }
 }
 
 

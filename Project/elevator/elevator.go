@@ -72,8 +72,8 @@ func (e *Elevator) Handle_message(message network.Message, backup *master.Backup
 
 	case network.Backup:
 		log.Printf("Recieved backup")
-		backup.Cab_reg = message.Payload.BackupCab
-		backup.Hall_reg = message.Payload.BackupHall
+		backup.Cab_req = message.Payload.BackupCab
+		backup.Hall_req = message.Payload.BackupHall
 		e.Send(network.Message{Header: network.Ack, UID: message.UID})
 
 	case network.Ack:
