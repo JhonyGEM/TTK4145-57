@@ -19,6 +19,7 @@ const Heartbeat_interval = 	5 * time.Second
 const Broadcast_rate =		1 * time.Second
 const Pending_resend_rate = 60 * time.Second
 const Reconnect_delay = 	5 * time.Second
+const Msg_buf_size =        (N_floors * N_buttons) * 2
 
 // Master
 const N_elevators = 		3

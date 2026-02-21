@@ -9,21 +9,21 @@ import (
 )
 
 func Create_request_arr(rows, cols int) [][]bool {
-	q := make([][]bool, rows)
+	request := make([][]bool, rows)
 
-	for i := range q {
-		q[i] = make([]bool, cols)
+	for i := range request {
+		request[i] = make([]bool, cols)
 	}
 
-	return q
+	return request
 }
 
 func Start_new_instance(id string) {
 	switch runtime.GOOS {
 	case "windows":
-		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go", "-id=%s", id).Run()
+		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go", fmt.Sprintf("-id=%s", id)).Run()
 	case "linux":
-		exec.Command("gnome-terminal", "--", "go", "run", "main.go").Run()
+		exec.Command("gnome-terminal", "--", "go", "run", "main.go", fmt.Sprintf("-id=%s", id)).Run()
 	default:
 		log.Print("Not supported os.")
 	}

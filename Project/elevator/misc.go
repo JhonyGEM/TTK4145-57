@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"sync"
 )
 
 func (e *Elevator) Update_lights(request [][]bool) {
@@ -23,16 +24,19 @@ func (e *Elevator) Send(message network.Message) {
 	}
 }
 
-func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}) {
+// Handles the reconnecting rutin and resend of the pending array
+func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 			case <-e.Reconnect_timer.C:
 				e.Retry_counter++
-				log.Printf("Retry counter: %d \n", e.Retry_counter)
+				log.Printf("Reconnect attempt: %d \n", e.Retry_counter)
 				e.Reconnect_timer.Stop()
 
 				if e.Retry_counter > config.Max_retries && e.Succesor {
 					close(quitChan)
+					wg.Wait()
+					elevio.Stop()
 					return
 				}
 
@@ -51,7 +55,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 				e.Connection = network.New_client(conn)
 				e.Connected = true
 				e.Send(network.Message{Header: network.ClientInfo, 
-									   Payload: &network.DataPayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
+									   Payload: &network.MessagePayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
 				go e.Connection.Heartbeat()
 

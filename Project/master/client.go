@@ -34,6 +34,7 @@ func (m *Master) Remove_client(addr string) {
 	}
 }
 
+// Handles task timer for each client
 func (m *Master) Client_timer_handler(timeout chan<- *network.Client) {
 	for {
 		for _, client := range m.Client_list {

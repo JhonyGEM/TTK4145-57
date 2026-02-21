@@ -5,10 +5,10 @@ import (
 	"fmt"
 )
 
-type HeaderType int
+type MessageType int
 
 const (
-    OrderReceived HeaderType = iota
+    OrderReceived MessageType = iota
     OrderFulfilled
     FloorUpdate
     ObstructionUpdate
@@ -20,7 +20,7 @@ const (
 	Ack
 )
 
-type DataPayload struct {
+type MessagePayload struct {
 	ID           string                 `json:"id,omitempty"`
 	CurrentFloor int                    `json:"current_floor,omitempty"`
 	Obstruction  bool					`json:"obstruction,omitempty"`
@@ -32,13 +32,13 @@ type DataPayload struct {
 }
 
 type Message struct {
-	Header  HeaderType      		`json:"header"`
-	Payload *DataPayload			`json:"payload,omitempty"`
+	Header  MessageType      		`json:"header"`
+	Payload *MessagePayload			`json:"payload,omitempty"`
 	Address string					`json:"address,omitempty"`
 	UID     string                  `json:"uid,omitempty"`
 }
 
-func (h HeaderType) String() string {
+func (h MessageType) String() string {
 	switch h {
 	case OrderReceived:
 		return "OrderReceived"

@@ -5,20 +5,22 @@ import (
 	"project/elevio"
 	"project/network"
 	"project/utilities"
+	"project/master"
 	"time"
+	"log"
 )
 
-type state int
+type ElevatorState int
 
 const (
-	Undefined state = iota
+	Undefined ElevatorState = iota
 	Idle
 	Moving
 	Door_open
 )
 
 type Elevator struct {
-	Current_state   state
+	Current_state   ElevatorState
 	Current_floor   int
 	Direction       elevio.MotorDirection
 	Obstruction     bool
@@ -55,4 +57,33 @@ func New_elevator(id string) *Elevator {
 	elevator.Door_timer_done = false
 
 	return elevator
+}
+
+func (e *Elevator) Handle_message(message network.Message, backup *master.Backup) {
+	log.Printf("Recieved: %v", message.Header)
+	switch message.Header {
+	case network.OrderReceived:
+		e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+		e.Save_pending()
+		e.Step_FSM()
+
+	case network.LightUpdate:
+		e.Update_lights(message.Payload.Lights)
+
+	case network.Backup:
+		log.Printf("Recieved backup")
+		backup.Cab_reg = message.Payload.BackupCab
+		backup.Hall_reg = message.Payload.BackupHall
+		e.Send(network.Message{Header: network.Ack, UID: message.UID})
+
+	case network.Ack:
+		_, ok := e.Pending[message.UID]
+		if ok {
+			delete(e.Pending, message.UID)
+			e.Save_pending()
+		}
+
+	case network.Succesor:
+		e.Succesor = true
+	}
 }

@@ -27,23 +27,27 @@ func (m *Master) find_closest_elevator(floor int) string {
 func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
 	if button == elevio.BT_Cab {
 		m.Client_list[addr].Busy = true
-		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-		m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
+		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+		if !m.Client_list[addr].Obstruction {
+			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
+		}
 	} else {
 		client_addr := m.find_closest_elevator(floor)
 		if client_addr != "" {
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
 			m.Client_list[client_addr].Busy = true
-			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.DataPayload{OrderFloor: floor, OrderButton: button}})
-			m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
+			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+			if !m.Client_list[client_addr].Obstruction {
+				m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
+			}
 		}
 	}
 	m.Send_light_update()
 }
 
-func (m *Master) Redistribute_request(id string) {
+func (m *Master) Redistribute_hall_request(id string) {
 	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
+		for b := elevio.ButtonType(0); b < elevio.ButtonType(1); b++ {
 			if m.Hall_assignments[f][b] == id {
 				m.Distribute_request(f, b, "")
 			}
@@ -70,6 +74,7 @@ func (m *Master) Resend_hall_request() {
 	}
 }
 
+// Check if client still have assigned requests
 func (m *Master) Still_busy(addr string) bool {
 	for f := 0; f < config.N_floors; f++ {
 		if m.Cab_requests[f][m.Client_list[addr].ID] {
@@ -84,4 +89,15 @@ func (m *Master) Still_busy(addr string) bool {
 		}
 	}
 	return true
+}
+
+func (m *Master) Send_light_update() {
+	for _, elev := range m.Client_list {
+		light := utilities.Create_request_arr(config.N_floors, config.N_buttons)
+		for f := 0; f < config.N_floors; f++ {
+			copy(light[f], m.Hall_requests[f])
+			light[f][elevio.BT_Cab] = m.Cab_requests[f][elev.ID]
+		}
+		elev.Send(network.Message{Header: network.LightUpdate, Payload: &network.MessagePayload{Lights: light}})
+	}
 }

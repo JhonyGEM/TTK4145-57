@@ -53,6 +53,7 @@ func (e *Elevator) Step_FSM() {
 
 		if (e.Obstruction) {
 			e.Door_timer.Reset(config.Open_duration)
+			e.Door_timer_done = false
 		} else {
 			if e.Door_timer_done {
 				elevio.SetDoorOpenLamp(false)
@@ -67,7 +68,7 @@ func (e *Elevator) Step_FSM() {
 	}
 }
 
-func (e *Elevator) Update_state(new_state state) {
+func (e *Elevator) Update_state(new_state ElevatorState) {
 	e.Current_state = new_state
 	e.Step_FSM()
 }

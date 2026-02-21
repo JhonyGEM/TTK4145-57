@@ -4,6 +4,7 @@ import "time"
 import "sync"
 import "net"
 import "fmt"
+import "log"
 
 
 
@@ -52,6 +53,10 @@ func Init(addr string, numFloors int) {
 	_initialized = true
 }
 
+func Stop() {
+	_initialized = false
+	_conn.Close()
+}
 
 
 func SetMotorDirection(dir MotorDirection) {
@@ -74,16 +79,15 @@ func SetStopLamp(value bool) {
 	write([4]byte{5, toByte(value), 0, 0})
 }
 
-func PollButtons(receiver chan<- ButtonEvent, quitChan <-chan struct{}) {
+func PollButtons(receiver chan<- ButtonEvent, quitChan <-chan struct{}, wg *sync.WaitGroup) {
 	prev := make([][3]bool, _numFloors)
 	ticker := time.NewTicker(_pollRate)
 	defer ticker.Stop()
+	defer wg.Done()
 
 	for {
 		select {
 		case <-quitChan:
-			_initialized = false
-			_conn.Close()
 			return
 
 		case <-ticker.C:
@@ -100,10 +104,11 @@ func PollButtons(receiver chan<- ButtonEvent, quitChan <-chan struct{}) {
 	}
 }
 
-func PollFloorSensor(receiver chan<- int, quitChan <-chan struct{}) {
+func PollFloorSensor(receiver chan<- int, quitChan <-chan struct{}, wg *sync.WaitGroup) {
 	prev := -1
 	ticker := time.NewTicker(_pollRate)
 	defer ticker.Stop()
+	defer wg.Done()
 
 	for {
 		select {
@@ -120,10 +125,11 @@ func PollFloorSensor(receiver chan<- int, quitChan <-chan struct{}) {
 	}
 }
 
-func PollStopButton(receiver chan<- bool, quitChan <-chan struct{}) {
+func PollStopButton(receiver chan<- bool, quitChan <-chan struct{}, wg *sync.WaitGroup) {
 	prev := false
 	ticker := time.NewTicker(_pollRate)
 	defer ticker.Stop()
+	defer wg.Done()
 
 	for {
 		select {
@@ -140,10 +146,11 @@ func PollStopButton(receiver chan<- bool, quitChan <-chan struct{}) {
 	}
 }
 
-func PollObstructionSwitch(receiver chan<- bool, quitChan <-chan struct{}) {
+func PollObstructionSwitch(receiver chan<- bool, quitChan <-chan struct{}, wg *sync.WaitGroup) {
 	prev := false
 	ticker := time.NewTicker(_pollRate)
 	defer ticker.Stop()
+	defer wg.Done()
 
 	for {
 		select {
@@ -196,11 +203,11 @@ func read(in [4]byte) [4]byte {
 	defer _mtx.Unlock()
 	
 	_, err := _conn.Write(in[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
+	if err != nil { log.Printf("Lost connection to Elevator Server") }
 	
 	var out [4]byte
 	_, err = _conn.Read(out[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
+	if err != nil { log.Printf("Lost connection to Elevator Server") }
 	
 	return out
 }
@@ -210,7 +217,7 @@ func write(in [4]byte) {
 	defer _mtx.Unlock()
 	
 	_, err := _conn.Write(in[:])
-	if err != nil { panic("Lost connection to Elevator Server") }
+	if err != nil { log.Printf("Lost connection to Elevator Server") }
 }
 
 
