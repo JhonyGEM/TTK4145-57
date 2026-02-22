@@ -12,7 +12,7 @@ func print_separator() {
 	fmt.Println(strings.Repeat(cell, config.N_floors) + "+")
 }
 
-func (m *Master) Print_hall_request() {
+func (m *Master) print_hall_request() {
 	fmt.Print("Hall request \n")
 	print_separator()
 	for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
@@ -34,7 +34,7 @@ func (m *Master) Print_hall_request() {
 	print_separator()
 }
 
-func (m *Master) Print_cab_request() {
+func (m *Master) print_cab_request() {
 	fmt.Print("Cab request \n")
 	print_separator()
 	for _, client := range m.Client_list {
@@ -50,7 +50,7 @@ func (m *Master) Print_cab_request() {
 	print_separator()
 }
 
-func (m *Master) Print_client_list() {
+func (m *Master) print_client_list() {
 	fmt.Print("Client list \n")
 	print_separator()
 	fmt.Printf("| %-*s| %-*s| %-*s| %-*s|\n", config.Cell_width, "ID", config.Cell_width, "Floor", config.Cell_width, "Obst", config.Cell_width, "AR")
@@ -59,4 +59,11 @@ func (m *Master) Print_client_list() {
 		fmt.Printf("| %-*s| %-*d| %-*t| %-*d|\n", config.Cell_width, client.ID, config.Cell_width, client.Current_floor, config.Cell_width, client.Obstruction, config.Cell_width, client.Active_req)
 	}
 	print_separator()
+}
+
+func (m *Master) Print() {
+	// TODO: clear terminal
+	m.print_client_list()
+	m.print_hall_request()
+	m.print_cab_request()
 }

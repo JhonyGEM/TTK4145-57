@@ -6,7 +6,6 @@ import (
 	"project/network"
 	"project/utilities"
 	"time"
-	"fmt"
 )
 
 type Backup struct {
@@ -36,6 +35,7 @@ type Elevator_client struct {
 	Connection 		*network.Client
 	ID 				string
 	Current_floor 	int
+	Previous_floor  int
 	Obstruction 	bool
 	Active_req      int
 	Task_timer 		*time.Timer
@@ -123,6 +123,7 @@ func (m *Master) Handle_message(message network.Message) {
 		}
 
 	case network.FloorUpdate:
+		m.Client_list[message.Address].Previous_floor = m.Client_list[message.Address].Current_floor
 		m.Client_list[message.Address].Current_floor = message.Payload.CurrentFloor
 
 	case network.ObstructionUpdate:
@@ -138,11 +139,9 @@ func (m *Master) Handle_message(message network.Message) {
 	case network.ClientInfo:
 		m.Client_list[message.Address].ID = message.Payload.ID
 		m.Client_list[message.Address].Current_floor = message.Payload.CurrentFloor
+		m.Client_list[message.Address].Previous_floor = message.Payload.CurrentFloor
 		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
 		m.Resend_cab_request(message.Address)
 	}
-	m.Print_hall_request()
-	//m.Print_cab_request()
-	//m.Print_client_list()
-	fmt.Printf("Pending len: %d \n", len(m.Pending))
+	m.Print()
 }

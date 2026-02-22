@@ -25,7 +25,6 @@ const (
 // TODO: Need to do
 // 1. Imporve code quality
 // 2. Test if everyting thats implemented works
-// 3. Improve find_closest_elevator
 
 func main() {
 	state := StateElevator

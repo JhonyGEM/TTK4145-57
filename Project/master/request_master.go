@@ -7,21 +7,35 @@ import (
 	"project/network"
 )
 
-func (m *Master) find_closest_elevator(floor int) string {
-	closest_addr := ""
-	shortest_dist := 9999
+func (m *Master) select_optimal_elevator(floor int, button elevio.ButtonType) string {
+	chosen_addr := ""
+	lowest_cost := 9999
 
 	for _, client := range m.Client_list {
-		distance := utilities.Abs(client.Current_floor - floor)
-		if client.Active_req > 0 {
-			distance += config.Busy_penalty * client.Active_req
+		cost := utilities.Abs(client.Current_floor - floor)
+		direction := client.Current_floor - client.Previous_floor
+
+		if direction < 0 {
+			if (button == elevio.BT_HallUp || button == elevio.BT_Cab) && floor > client.Current_floor {
+				cost += config.Direction_penalty
+			} else {
+				cost -= config.Direction_penalty
+			}
+		} else if direction > 0 {
+			if (button == elevio.BT_HallDown || button == elevio.BT_Cab) && floor < client.Current_floor{
+				cost += config.Direction_penalty
+			} else {
+				cost -= config.Direction_penalty
+			}
 		}
-		if distance < shortest_dist {
-			closest_addr = client.Connection.Addr
-			shortest_dist = distance
+		cost += config.Busy_penalty * client.Active_req
+
+		if cost < lowest_cost {
+			chosen_addr = client.Connection.Addr
+			lowest_cost = cost
 		}
 	}
-	return closest_addr
+	return chosen_addr
 }
 
 func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
@@ -33,7 +47,7 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
 		}
 	} else {
-		client_addr := m.find_closest_elevator(floor)
+		client_addr := m.select_optimal_elevator(floor, button)
 		if client_addr != "" {
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
 			m.Client_list[client_addr].Active_req++

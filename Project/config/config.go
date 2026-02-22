@@ -23,7 +23,8 @@ const Msg_buf_size =        (N_floors * N_buttons) * 2
 
 // Master
 const N_elevators = 		3
-const Busy_penalty = 		5
+const Busy_penalty = 		N_floors
+const Direction_penalty =   2
 const Max_retries = 		1
 const Request_timeout = 	N_floors * 4 * time.Second
 const Resend_rate =         30 * time.Second
