@@ -8,7 +8,7 @@ import (
 )
 
 func (ec *Elevator_client) Send(message network.Message) {
-	if ec.Connection != nil {
+	if ec.Connection.Conn != nil {
 		ec.Connection.Send(message)
 	}
 }

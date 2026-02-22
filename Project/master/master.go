@@ -143,5 +143,5 @@ func (m *Master) Handle_message(message network.Message) {
 		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
 		m.Resend_cab_request(message.Address)
 	}
-	m.Print()
+	//m.Print()
 }

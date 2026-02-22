@@ -5,6 +5,7 @@ import (
 	"project/elevio"
 	"project/utilities"
 	"project/network"
+	"fmt"
 )
 
 func (m *Master) select_optimal_elevator(floor int, button elevio.ButtonType) string {
@@ -16,25 +17,30 @@ func (m *Master) select_optimal_elevator(floor int, button elevio.ButtonType) st
 		direction := client.Current_floor - client.Previous_floor
 
 		if direction < 0 {
-			if (button == elevio.BT_HallUp || button == elevio.BT_Cab) && floor > client.Current_floor {
-				cost += config.Direction_penalty
-			} else {
-				cost -= config.Direction_penalty
+			if button == elevio.BT_HallUp {
+				cost += config.Cost_penalty
 			}
 		} else if direction > 0 {
-			if (button == elevio.BT_HallDown || button == elevio.BT_Cab) && floor < client.Current_floor{
-				cost += config.Direction_penalty
-			} else {
-				cost -= config.Direction_penalty
+			if button == elevio.BT_HallDown {
+				cost += config.Cost_penalty
 			}
 		}
-		cost += config.Busy_penalty * client.Active_req
+
+		if client.Active_req > 0 {
+			for f := 0; f < config.N_floors; f++ {
+				if (m.Hall_requests[f][elevio.BT_HallUp] && m.Hall_assignments[f][elevio.BT_HallUp] == client.ID) || 
+				   (m.Hall_requests[f][elevio.BT_HallDown] && m.Hall_assignments[f][elevio.BT_HallDown] == client.ID) {
+					cost += utilities.Abs(floor - f) * 2
+				}
+			}
+		}
 
 		if cost < lowest_cost {
 			chosen_addr = client.Connection.Addr
 			lowest_cost = cost
 		}
 	}
+	fmt.Printf("Cost: %d, chosen client: %s \n", lowest_cost, m.Client_list[chosen_addr].ID)
 	return chosen_addr
 }
 
