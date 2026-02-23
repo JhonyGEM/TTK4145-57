@@ -21,13 +21,13 @@ func New_backup() *Backup {
 }
 
 type Master struct {
-	Client_list 	     map[string]*Elevator_client // key is addr
+	Client_list 	     map[string]*Elevator_client	// key = address
 	Hall_requests        [][]bool
 	Hall_assignments     [][]string
 	Cab_requests         []map[string]bool
 	Successor_addr       string
 	Sequence             int
-	Pending              map[string]*network.Message
+	Pending              map[string]*network.Message	// key = uid
 	Resend_ticker        *time.Ticker
 }
 
@@ -73,15 +73,20 @@ func (m *Master) Handle_message(message network.Message) {
 	//log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
 	switch message.Header {
 	case network.OrderReceived:
-		if message.Payload.OrderButton == elevio.BT_Cab {
-			m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = true
+		if !m.Is_request_active(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
+			if message.Payload.OrderButton == elevio.BT_Cab {
+				m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = true
+			} else {
+				m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+			}
+			m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
+																Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+																UID: message.UID})
+			m.Pending[message.UID] = &message
 		} else {
-			m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+			m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
+															    UID: message.UID})
 		}
-		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
-															 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
-															 UID: message.UID})
-		m.Pending[message.UID] = &message
 
 	case network.OrderFulfilled:
 		if message.Payload.OrderButton == elevio.BT_Cab {

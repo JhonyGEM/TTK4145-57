@@ -65,6 +65,9 @@ func (e *Elevator) should_stop() bool {
 	case elevio.MD_Up:
 		return e.requests[e.current_floor][elevio.BT_HallUp] || e.requests[e.current_floor][elevio.BT_Cab] || !e.request_above()
 	
+	case elevio.MD_Stop:
+		return !e.request_below() && !e.request_above()
+		
 	default:
 		return false
 	}

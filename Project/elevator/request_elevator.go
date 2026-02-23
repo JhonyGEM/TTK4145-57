@@ -6,7 +6,7 @@ import (
 	"project/network"
 )
 
-func (e *Elevator) pending_request() bool {
+func (e *Elevator) request_pending() bool {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
 			if e.Requests[f][b] {
@@ -62,6 +62,9 @@ func (e *Elevator) should_stop() bool {
 
 	case elevio.MD_Up:
 		return e.Requests[e.Current_floor][elevio.BT_HallUp] || e.Requests[e.Current_floor][elevio.BT_Cab] || !e.request_above()
+
+	case elevio.MD_Stop:
+		return !e.request_below() && !e.request_above()
 	
 	default:
 		return false
@@ -71,8 +74,8 @@ func (e *Elevator) should_stop() bool {
 func (e *Elevator) should_clear() bool {
 	return ((e.Direction == elevio.MD_Up && e.Requests[e.Current_floor][elevio.BT_HallUp]) ||
 		    (e.Direction == elevio.MD_Down && e.Requests[e.Current_floor][elevio.BT_HallDown]) ||
-		    (e.Direction == elevio.MD_Stop) ||
-		    (e.Requests[e.Current_floor][elevio.BT_Cab]))
+		    e.Direction == elevio.MD_Stop ||
+		    e.Requests[e.Current_floor][elevio.BT_Cab])
 }
 
 func (e *Elevator) clear_request(floor int, button elevio.ButtonType) {

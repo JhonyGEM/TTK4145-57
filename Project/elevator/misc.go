@@ -30,15 +30,16 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 		select {
 			case <-e.Reconnect_timer.C:
 				e.Retry_counter++
-				log.Printf("Reconnect attempt: %d \n", e.Retry_counter)
 				e.Reconnect_timer.Stop()
 
 				if e.Retry_counter > config.Max_retries && e.Succesor {
+					log.Print("Max retries reached, elevator becomes master \n")
 					close(quitChan)
 					wg.Wait()
 					elevio.Stop()
 					return
 				}
+				log.Printf("Reconnect attempt: %d \n", e.Retry_counter)
 
 				addr, err := network.Discover_server()
 				if err != nil {
@@ -58,6 +59,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 									   Payload: &network.MessagePayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
 				go e.Connection.Heartbeat()
+				log.Printf("Connected to server \n")
 
 			case <-e.Pending_ticker.C:
 				if e.Connected {

@@ -62,7 +62,6 @@ func (m *Master) print_client_list() {
 }
 
 func (m *Master) Print() {
-	// TODO: clear terminal
 	m.print_client_list()
 	m.print_hall_request()
 	m.print_cab_request()

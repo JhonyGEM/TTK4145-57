@@ -5,32 +5,23 @@ import (
 	"project/elevio"
 	"project/utilities"
 	"project/network"
-	"fmt"
 )
 
-func (m *Master) select_optimal_elevator(floor int, button elevio.ButtonType) string {
+func (m *Master) select_optimal_elevator(floor int) string {
 	chosen_addr := ""
 	lowest_cost := 9999
 
 	for _, client := range m.Client_list {
-		cost := utilities.Abs(client.Current_floor - floor)
-		direction := client.Current_floor - client.Previous_floor
-
-		if direction < 0 {
-			if button == elevio.BT_HallUp {
-				cost += config.Cost_penalty
-			}
-		} else if direction > 0 {
-			if button == elevio.BT_HallDown {
-				cost += config.Cost_penalty
-			}
-		}
-
+		curr_floor := client.Current_floor
+		cost := utilities.Abs(curr_floor - floor) + client.Active_req * config.Cost_penalty
+		
 		if client.Active_req > 0 {
 			for f := 0; f < config.N_floors; f++ {
-				if (m.Hall_requests[f][elevio.BT_HallUp] && m.Hall_assignments[f][elevio.BT_HallUp] == client.ID) || 
-				   (m.Hall_requests[f][elevio.BT_HallDown] && m.Hall_assignments[f][elevio.BT_HallDown] == client.ID) {
-					cost += utilities.Abs(floor - f) * 2
+				for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
+					if m.Hall_requests[f][b] && m.Hall_assignments[f][b] == client.ID {
+						cost += utilities.Abs(curr_floor - f)
+						curr_floor = f
+					}
 				}
 			}
 		}
@@ -40,8 +31,16 @@ func (m *Master) select_optimal_elevator(floor int, button elevio.ButtonType) st
 			lowest_cost = cost
 		}
 	}
-	fmt.Printf("Cost: %d, chosen client: %s \n", lowest_cost, m.Client_list[chosen_addr].ID)
+	//log.Printf("Cost: %d, chosen client: %s \n", lowest_cost, m.Client_list[chosen_addr].ID)
 	return chosen_addr
+}
+
+func (m *Master) Is_request_active(floor int, button elevio.ButtonType, addr string) bool {
+	if button == elevio.BT_Cab {
+		return m.Cab_requests[floor][m.Client_list[addr].ID]
+	} else {
+		return m.Hall_requests[floor][button]
+	}
 }
 
 func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
@@ -53,7 +52,7 @@ func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr st
 			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
 		}
 	} else {
-		client_addr := m.select_optimal_elevator(floor, button)
+		client_addr := m.select_optimal_elevator(floor)
 		if client_addr != "" {
 			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
 			m.Client_list[client_addr].Active_req++

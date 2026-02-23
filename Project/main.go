@@ -20,11 +20,12 @@ const (
 )
 
 // TODO: Problems
+// System can be slow to detect of the client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
 
 
 // TODO: Need to do
 // 1. Imporve code quality
-// 2. Test if everyting thats implemented works
+
 
 func main() {
 	state := StateElevator
@@ -107,6 +108,7 @@ func main() {
 					e.Step_FSM()
 
 				case <-lossChan:
+					log.Print("Disconnected from server \n")
 					e.Connected = false
 					e.Connection = &network.Client{}
 					e.Reconnect_timer.Reset(config.Reconnect_delay)
@@ -137,7 +139,7 @@ func main() {
 			
 
 			go network.Start_server(lossChan, newChan, msgChan)
-			go m.Client_timer_handler(lossChan)
+			go m.Client_timer_handler()
 
 			for {
 				select {

@@ -36,14 +36,14 @@ func (m *Master) Remove_client(addr string) {
 }
 
 // Handles task timer for each client
-func (m *Master) Client_timer_handler(timeout chan<- *network.Client) {
+func (m *Master) Client_timer_handler() {
 	for {
 		for _, client := range m.Client_list {
 			if client.Task_timer != nil {
 				select {
 				case <-client.Task_timer.C:
 					client.Task_timer.Stop()
-					timeout<- client.Connection
+					client.Connection.Conn.Close()
 
 				default:
 				
