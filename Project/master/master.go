@@ -21,6 +21,7 @@ func New_backup() *Backup {
 }
 
 type Master struct {
+	Address				 string
 	Client_list 	     map[string]*Elevator_client	// key = address
 	Hall_requests        [][]bool
 	Hall_assignments     [][]string
@@ -59,10 +60,12 @@ func create_hall_assignment_arr(floors, buttons int) [][]string {
 
 func New_master() *Master {
 	return &Master{
+		Address:    	  "",
 		Client_list :     make(map[string]*Elevator_client),
 		Hall_requests:    utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Hall_assignments: create_hall_assignment_arr(config.N_floors, config.N_buttons),
 		Cab_requests:     Create_cab_request_arr(config.N_floors),
+		Successor_addr:   "",
 		Sequence:		  0,
 		Pending:          make(map[string]*network.Message),
 		Resend_ticker:    time.NewTicker(config.Resend_rate),
@@ -79,10 +82,12 @@ func (m *Master) Handle_message(message network.Message) {
 			} else {
 				m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 			}
-			m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
-																Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
-																UID: message.UID})
 			m.Pending[message.UID] = &message
+			if m.Successor_addr != "" {
+				m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
+																	 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+																	 UID: message.UID})
+			}
 		} else {
 			m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
 															    UID: message.UID})

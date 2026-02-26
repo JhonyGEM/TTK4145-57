@@ -10,6 +10,7 @@ import (
 	"project/network"
 	"project/utilities"
 	"sync"
+	"net"
 )
 
 type MainState int
@@ -25,7 +26,7 @@ const (
 
 // TODO: Need to do
 // 1. Imporve code quality
-
+// Updated so the successor can only be chosen on different pc than master. But need to handle order messages (backup sync) when there is no successor.
 
 func main() {
 	state := StateElevator
@@ -113,7 +114,6 @@ func main() {
 					e.Connection = &network.Client{}
 					e.Reconnect_timer.Reset(config.Reconnect_delay)
 					e.Remove_hall_requests()
-					//e.Update_state(elevator.Undefined)
 					e.Step_FSM()
 
 				case message := <-msgChan:
@@ -137,15 +137,20 @@ func main() {
 			lossChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 			
-
 			go network.Start_server(lossChan, newChan, msgChan)
 			go m.Client_timer_handler()
+
+			for m.Address == "" {
+				if addr, err := network.Discover_server(); err == nil {
+					m.Address, _, _ = net.SplitHostPort(addr)
+				}
+			}
 
 			for {
 				select {
 					case new := <-newChan:
 						m.Add_client(new)
-						if len(m.Client_list) == 1 {
+						if m.Successor_addr == "" && m.Address != new.Get_ip() {
 							m.Successor_addr = new.Addr
 							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
 						}
@@ -159,11 +164,15 @@ func main() {
 							panic("Loss of internet")
 						} else {
 							if lost.Addr == m.Successor_addr {
+								m.Successor_addr = ""
 								for _, c := range m.Client_list {
-									m.Successor_addr = c.Connection.Addr
-									c.Send(network.Message{Header: network.Succesor})
-									break
+									if m.Address != c.Connection.Get_ip() {
+										m.Successor_addr = c.Connection.Addr
+										c.Send(network.Message{Header: network.Succesor})
+										break
+									}
 								}
+								log.Print("No suitable successor found \n")
 							}
 							m.Redistribute_hall_request(id)
 						}

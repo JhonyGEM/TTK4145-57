@@ -59,6 +59,11 @@ func New_client(conn *net.TCPConn) *Client {
     }
 }
 
+func (c *Client) Get_ip() string {
+	addr, _, _ := net.SplitHostPort(c.Addr)
+	return addr
+}
+
 func (c *Client) Listen(msgChan chan<- Message, lossChan chan<- *Client) {
 	defer c.terminate(lossChan)
 
