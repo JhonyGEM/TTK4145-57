@@ -113,7 +113,7 @@ func main() {
 					e.Connection = &network.Client{}
 					e.Reconnect_timer.Reset(config.Reconnect_delay)
 					e.Remove_hall_requests()
-					e.Update_state(elevator.Undefined)
+					//e.Update_state(elevator.Undefined)
 					e.Step_FSM()
 
 				case message := <-msgChan:
