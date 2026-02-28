@@ -143,3 +143,12 @@ func Connect(server_addr string) (*net.TCPConn, error) {
 	}
 	return conn.(*net.TCPConn), nil
 }
+
+func Has_internet_connection() bool {
+	conn, err := net.DialTimeout("tcp", "8.8.8.8:53", config.Dialer_timeout)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}

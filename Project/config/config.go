@@ -17,7 +17,8 @@ const Dialer_timeout = 		5 * time.Second
 const Inactivity_timeout = 	10 * time.Second
 const Heartbeat_interval = 	5 * time.Second
 const Broadcast_rate =		1 * time.Second
-const Pending_resend_rate = 60 * time.Second
+const Pending_timeout =     60 * time.Second
+const Pending_check_rate =  2 * time.Second
 const Reconnect_delay = 	5 * time.Second
 const Msg_buf_size =        (N_floors * N_buttons) * 2
 

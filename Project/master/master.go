@@ -6,6 +6,7 @@ import (
 	"project/network"
 	"project/utilities"
 	"time"
+	"log"
 )
 
 type Backup struct {
@@ -26,6 +27,7 @@ type Master struct {
 	Hall_requests        [][]bool
 	Hall_assignments     [][]string
 	Cab_requests         []map[string]bool
+	Has_successor        bool
 	Successor_addr       string
 	Sequence             int
 	Pending              map[string]*network.Message	// key = uid
@@ -65,11 +67,24 @@ func New_master() *Master {
 		Hall_requests:    utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Hall_assignments: create_hall_assignment_arr(config.N_floors, config.N_buttons),
 		Cab_requests:     Create_cab_request_arr(config.N_floors),
+		Has_successor:    false,
 		Successor_addr:   "",
 		Sequence:		  0,
 		Pending:          make(map[string]*network.Message),
 		Resend_ticker:    time.NewTicker(config.Resend_rate),
 	}
+}
+
+func (m *Master) Find_new_successor() {
+	for _, client := range m.Client_list {
+		if m.Address != client.Connection.Get_ip() {
+			m.Has_successor = true
+			m.Successor_addr = client.Connection.Addr
+			client.Send(network.Message{Header: network.Succesor})
+			break
+		}
+	}
+	log.Print("No suitable successor found \n")
 }
 
 func (m *Master) Handle_message(message network.Message) {
@@ -82,15 +97,19 @@ func (m *Master) Handle_message(message network.Message) {
 			} else {
 				m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 			}
-			m.Pending[message.UID] = &message
-			if m.Successor_addr != "" {
+			
+			if m.Has_successor {
+				m.Pending[message.UID] = &message
 				m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
 																	 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
 																	 UID: message.UID})
 			}
 		} else {
-			m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
-															    UID: message.UID})
+			if m.Has_successor {
+				// Repeated request -> send ack to elevator to remove from pending list
+				m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
+																	UID: message.UID})
+			}
 		}
 
 	case network.OrderFulfilled:
@@ -108,12 +127,14 @@ func (m *Master) Handle_message(message network.Message) {
 			m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
 		}
 
-		message.UID = utilities.Gen_uid(m.Client_list[m.Successor_addr].ID, m.Sequence)
-		m.Sequence++
-		m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
-															 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
-															 UID: message.UID})
-		m.Pending[message.UID] = &message
+		if m.Has_successor {
+			message.UID = utilities.Gen_uid("master", m.Sequence)
+			m.Sequence++
+			m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
+																Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+																UID: message.UID})
+			m.Pending[message.UID] = &message
+		}
 
 	case network.Ack:
 		_, ok := m.Pending[message.UID]

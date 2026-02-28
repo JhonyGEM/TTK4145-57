@@ -19,6 +19,11 @@ const (
 	Door_open
 )
 
+type Pending struct {
+	Timestamp time.Time
+	Message   network.Message
+}
+
 type Elevator struct {
 	Current_state   ElevatorState
 	Current_floor   int
@@ -26,13 +31,13 @@ type Elevator struct {
 	Obstruction     bool
 	Requests        [][]bool
 	Id              string
-	Succesor        bool
+	Is_succesor     bool
 	//Network
 	Connection      *network.Client
-	Connected       bool
+	Is_connected    bool
 	Retry_counter   int
 	Sequence        int
-	Pending         map[string]*network.Message
+	Pending         map[string]*Pending    // key = uid
 	//Timers
 	Door_timer      *time.Timer
 	Door_timer_done bool
@@ -46,14 +51,14 @@ func New_elevator(id string) *Elevator {
 		Current_floor:   -1,
 		Requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Id:              id,
-		Succesor:        true,
-		Connected:       false,
+		Is_succesor:        true,
+		Is_connected:       false,
 		Retry_counter:   0,
 		Sequence:        0,
-		Pending:         make(map[string]*network.Message),
+		Pending:         make(map[string]*Pending),
 		Door_timer:      time.NewTimer(config.Open_duration),
 		Reconnect_timer: time.NewTimer(config.Reconnect_delay),
-		Pending_ticker:  time.NewTicker(config.Pending_resend_rate),
+		Pending_ticker:  time.NewTicker(config.Pending_check_rate),
 	}
 	elevator.Door_timer.Stop()
 	elevator.Door_timer_done = false
@@ -66,7 +71,6 @@ func (e *Elevator) Handle_message(message network.Message, backup *master.Backup
 	case network.OrderReceived:
 		log.Printf("Recieved order: floor %d, button %d", message.Payload.OrderFloor, message.Payload.OrderButton)
 		e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
-		e.Save_pending()
 		e.Step_FSM()
 
 	case network.LightUpdate:
@@ -86,7 +90,7 @@ func (e *Elevator) Handle_message(message network.Message, backup *master.Backup
 		}
 
 	case network.Succesor:
-		log.Print("Elevator become successor \n")
-		e.Succesor = true
+		log.Print("Elevator is now successor \n")
+		e.Is_succesor = true
 	}
 }

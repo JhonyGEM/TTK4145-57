@@ -22,7 +22,7 @@ func (e *Elevator) Step_FSM() {
 		if e.request_pending() {
 			if e.request_here() {
 				e.clear_at_current_floor()
-				if !e.Connected {
+				if !e.Is_connected {
 					e.Update_lights(e.Requests)
 				}
 				e.Door_timer.Reset(config.Open_duration)
@@ -37,7 +37,7 @@ func (e *Elevator) Step_FSM() {
 			e.update_direction(elevio.MD_Stop)
 			if e.should_clear() {
 				e.clear_at_current_floor()
-				if !e.Connected {
+				if !e.Is_connected {
 					e.Update_lights(e.Requests)
 				}
 			}

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
 	"project/config"
 	"project/elevator"
 	"project/elevio"
@@ -10,7 +11,7 @@ import (
 	"project/network"
 	"project/utilities"
 	"sync"
-	"net"
+	"time"
 )
 
 type MainState int
@@ -21,12 +22,13 @@ const (
 )
 
 // TODO: Problems
-// System can be slow to detect of the client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
+// System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
+// If master do not have successor, then it accepts orders but do not distribute them
 
 
 // TODO: Need to do
 // 1. Imporve code quality
-// Updated so the successor can only be chosen on different pc than master. But need to handle order messages (backup sync) when there is no successor.
+
 
 func main() {
 	state := StateElevator
@@ -44,7 +46,7 @@ func main() {
 
 			e := elevator.New_elevator(*id)
 			elevio.Init("localhost:15657", config.N_floors)
-			e.Succesor = *succesor
+			e.Is_succesor = *succesor
 			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
@@ -72,7 +74,7 @@ func main() {
 						e.Current_floor = floor
 						elevio.SetFloorIndicator(floor)
 						e.Step_FSM()
-						if e.Connected {
+						if e.Is_connected {
 							e.Send(network.Message{Header: network.FloorUpdate, 
 												   Payload: &network.MessagePayload{CurrentFloor: e.Current_floor}})
 						}
@@ -81,11 +83,14 @@ func main() {
 				case btn := <-drv_buttons:
 					if prev_btn != btn {
 						prev_btn = btn
-						if e.Connected {
-							message := network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, UID: utilities.Gen_uid(e.Id, e.Sequence)}
-							e.Sequence++
-							e.Pending[message.UID] = &message
+						if e.Is_connected {
+							message := network.Message{Header: network.OrderReceived, 
+													   Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, 
+													   UID: utilities.Gen_uid(e.Id, e.Sequence)}
 							e.Send(message)
+							e.Sequence++
+							e.Pending[message.UID] = &elevator.Pending{Message: message, Timestamp: time.Now()}
+							e.Save_pending()
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
@@ -98,7 +103,7 @@ func main() {
 				case obs := <-drv_obstruction:
 					e.Obstruction = obs
 					e.Step_FSM()
-					if e.Connected {
+					if e.Is_connected {
 						e.Send(network.Message{Header: network.ObstructionUpdate, 
 											   Payload: &network.MessagePayload{Obstruction: e.Obstruction}})
 					}
@@ -110,7 +115,7 @@ func main() {
 
 				case <-lossChan:
 					log.Print("Disconnected from server \n")
-					e.Connected = false
+					e.Is_connected = false
 					e.Connection = &network.Client{}
 					e.Reconnect_timer.Reset(config.Reconnect_delay)
 					e.Remove_hall_requests()
@@ -150,7 +155,8 @@ func main() {
 				select {
 					case new := <-newChan:
 						m.Add_client(new)
-						if m.Successor_addr == "" && m.Address != new.Get_ip() {
+						if !m.Has_successor && m.Address == new.Get_ip() {
+							m.Has_successor = true
 							m.Successor_addr = new.Addr
 							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
 						}
@@ -164,15 +170,9 @@ func main() {
 							panic("Loss of internet")
 						} else {
 							if lost.Addr == m.Successor_addr {
+								m.Has_successor = false
 								m.Successor_addr = ""
-								for _, c := range m.Client_list {
-									if m.Address != c.Connection.Get_ip() {
-										m.Successor_addr = c.Connection.Addr
-										c.Send(network.Message{Header: network.Succesor})
-										break
-									}
-								}
-								log.Print("No suitable successor found \n")
+								m.Find_new_successor()
 							}
 							m.Redistribute_hall_request(id)
 						}
@@ -181,7 +181,7 @@ func main() {
 						m.Handle_message(message)
 
 					case <-m.Resend_ticker.C:
-						if len(m.Client_list) > 0 {
+						if m.Has_successor && len(m.Client_list) > 0 {
 							m.Resend_hall_request() 
 						} 
 				}

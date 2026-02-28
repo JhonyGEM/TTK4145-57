@@ -1,13 +1,14 @@
 package elevator
 
 import (
-	"project/config"
-	"project/network"
-	"project/elevio"
 	"encoding/json"
 	"log"
 	"os"
+	"project/config"
+	"project/elevio"
+	"project/network"
 	"sync"
+	"time"
 )
 
 func (e *Elevator) Update_lights(request [][]bool) {
@@ -32,8 +33,8 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 				e.Retry_counter++
 				e.Reconnect_timer.Stop()
 
-				if e.Retry_counter > config.Max_retries && e.Succesor {
-					log.Print("Max retries reached, elevator becomes master \n")
+				if e.Retry_counter > config.Max_retries && e.Is_succesor && network.Has_internet_connection() {
+					log.Print("Max tries reached, elevator becomes master \n")
 					close(quitChan)
 					wg.Wait()
 					elevio.Stop()
@@ -54,7 +55,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 
 				e.Retry_counter = 0 
 				e.Connection = network.New_client(conn)
-				e.Connected = true
+				e.Is_connected = true
 				e.Send(network.Message{Header: network.ClientInfo, 
 									   Payload: &network.MessagePayload{ID: e.Id, CurrentFloor: e.Current_floor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
@@ -62,10 +63,12 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 				log.Printf("Connected to server \n")
 
 			case <-e.Pending_ticker.C:
-				if e.Connected {
-					if len(e.Pending) > 0 {
-						for _, message := range e.Pending {
-							e.Send(*message)
+				if e.Is_connected && len(e.Pending) > 0 {
+					for _, pend_msg := range e.Pending {
+						if time.Since(pend_msg.Timestamp) > config.Pending_timeout {
+							e.Send(pend_msg.Message)
+							e.Pending[pend_msg.Message.UID].Timestamp = time.Now()
+							e.Save_pending()
 						}
 					}
 				}
@@ -84,7 +87,7 @@ func (e *Elevator) Load_pending() {
 		return
 	}
 
-	var pending map[string]*network.Message
+	var pending map[string]*Pending
 	if err := json.Unmarshal(data, &pending); err != nil {
 		return
 	}
