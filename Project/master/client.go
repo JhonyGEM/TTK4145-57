@@ -15,12 +15,12 @@ func (ec *Elevator_client) Send(message network.Message) {
 
 func (m *Master) Add_client(c *network.Client) {
 	elev := &Elevator_client{
-		Connection:    c,
-		Current_floor: 0,
+		Connection:     c,
+		Current_floor:  0,
 		Previous_floor: 0,
-		Obstruction:   false,
-		Active_req:    0,
-		Task_timer:    time.NewTimer(config.Request_timeout),
+		Obstruction:    false,
+		Active_req:     0,
+		Task_timer:     time.NewTimer(config.Request_timeout),
 	}
 	elev.Task_timer.Stop()
 	m.Client_list[c.Addr] = elev

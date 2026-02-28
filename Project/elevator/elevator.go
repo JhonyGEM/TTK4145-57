@@ -45,14 +45,14 @@ type Elevator struct {
 	Pending_ticker  *time.Ticker
 }
 
-func New_elevator(id string) *Elevator {
+func New_elevator(id string, succesor bool) *Elevator {
 	elevator := &Elevator{
 		Current_state:   Undefined,
 		Current_floor:   -1,
 		Requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
 		Id:              id,
-		Is_succesor:        true,
-		Is_connected:       false,
+		Is_succesor:     succesor,
+		Is_connected:    false,
 		Retry_counter:   0,
 		Sequence:        0,
 		Pending:         make(map[string]*Pending),

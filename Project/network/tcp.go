@@ -50,12 +50,12 @@ func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<
 
 func New_client(conn *net.TCPConn) *Client {
     return &Client{
-        Conn:   conn,
-        Reader: bufio.NewReader(conn),
-		Writer: bufio.NewWriter(conn),
-        Addr:   conn.RemoteAddr().String(),
+        Conn:     conn,
+        Reader:   bufio.NewReader(conn),
+		Writer:   bufio.NewWriter(conn),
+        Addr:     conn.RemoteAddr().String(),
 		Activity: make(chan struct{}),
-		Stop:   make(chan struct{}),
+		Stop:     make(chan struct{}),
     }
 }
 

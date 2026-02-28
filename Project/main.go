@@ -44,9 +44,8 @@ func main() {
 		case StateElevator:
 			log.Printf("Starting elevator \n")
 
-			e := elevator.New_elevator(*id)
+			e := elevator.New_elevator(*id, *succesor)
 			elevio.Init("localhost:15657", config.N_floors)
-			e.Is_succesor = *succesor
 			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
@@ -155,7 +154,7 @@ func main() {
 				select {
 					case new := <-newChan:
 						m.Add_client(new)
-						if !m.Has_successor && m.Address == new.Get_ip() {
+						if !m.Has_successor && m.Address != new.Get_ip() {
 							m.Has_successor = true
 							m.Successor_addr = new.Addr
 							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})

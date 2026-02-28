@@ -23,7 +23,7 @@ func broadcast() {
 
 	for {
 		conn.Write([]byte("Hello"))
-		time.Sleep(config.Broadcast_rate)
+		time.Sleep(config.UDP_broadcast_rate)
 	}
 }
 

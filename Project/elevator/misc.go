@@ -25,7 +25,7 @@ func (e *Elevator) Send(message network.Message) {
 	}
 }
 
-// Handles the reconnecting rutin and resend of the pending array
+// Handles the reconnecting routine and resending of the messages that have not been acknowledged within time limit
 func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, wg *sync.WaitGroup) {
 	for {
 		select {

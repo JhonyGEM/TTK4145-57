@@ -91,21 +91,19 @@ func (m *Master) Handle_message(message network.Message) {
 	//log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
 	switch message.Header {
 	case network.OrderReceived:
-		if !m.Is_request_active(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
-			if message.Payload.OrderButton == elevio.BT_Cab {
-				m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = true
-			} else {
-				m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
-			}
-			
-			if m.Has_successor {
+		if m.Has_successor {
+			if !m.Is_request_active(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
+				if message.Payload.OrderButton == elevio.BT_Cab {
+					m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = true
+				} else {
+					m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+				}
 				m.Pending[message.UID] = &message
 				m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
 																	 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
 																	 UID: message.UID})
-			}
-		} else {
-			if m.Has_successor {
+
+			} else {
 				// Repeated request -> send ack to elevator to remove from pending list
 				m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
 																	UID: message.UID})
