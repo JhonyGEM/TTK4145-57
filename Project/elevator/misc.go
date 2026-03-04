@@ -26,7 +26,7 @@ func (e *Elevator) Send(message network.Message) {
 }
 
 // Handles the reconnecting routine and resending of the messages that have not been acknowledged within time limit
-func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, wg *sync.WaitGroup) {
+func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, pendChan chan<- string, wg *sync.WaitGroup) {
 	for {
 		select {
 			case <-e.Reconnect_timer.C:
@@ -66,9 +66,7 @@ func (e *Elevator) Timer_handler(msgChan chan<- network.Message, lossChan chan<-
 				if e.Is_connected && len(e.Pending) > 0 {
 					for _, pend_msg := range e.Pending {
 						if time.Since(pend_msg.Timestamp) > config.Pending_timeout {
-							e.Send(pend_msg.Message)
-							e.Pending[pend_msg.Message.UID].Timestamp = time.Now()
-							e.Save_pending()
+							pendChan <- pend_msg.Message.UID
 						}
 					}
 				}

@@ -56,12 +56,13 @@ func main() {
 			lossChan := make(chan *network.Client)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 			quitChan := make(chan struct{})
+			pendChan := make(chan string)
 
 			wg.Add(3)
 			go elevio.PollButtons(drv_buttons, quitChan, &wg)
 			go elevio.PollFloorSensor(drv_floors, quitChan, &wg)
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan, &wg)
-			go e.Timer_handler(msgChan, lossChan, quitChan, &wg)
+			go e.Timer_handler(msgChan, lossChan, quitChan, pendChan, &wg)
 
 			e.Load_pending()
 			e.Step_FSM()
@@ -127,6 +128,12 @@ func main() {
 					state = StateMaster
 					utilities.Start_new_instance(e.Id)
 					continue
+
+				case uid := <-pendChan:
+					log.Println("Resending pending")
+					e.Send(e.Pending[uid].Message)
+					e.Pending[uid].Timestamp = time.Now()
+					e.Save_pending()
 				}
 			}
 
@@ -154,7 +161,7 @@ func main() {
 				select {
 					case new := <-newChan:
 						m.Add_client(new)
-						if !m.Has_successor && m.Address != new.Get_ip() {
+						if !m.Has_successor && m.Address == new.Get_ip() {
 							m.Has_successor = true
 							m.Successor_addr = new.Addr
 							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
