@@ -33,9 +33,12 @@ const (
 func main() {
 	state := StateElevator
 
-	succesor := flag.Bool("succesor", false, "Succesor enable")
 	id := flag.String("id", "", "ID value")
+	succesor := flag.Bool("succesor", false, "Succesor enable")
 	flag.Parse()
+	if *id == "" {
+    	log.Fatal("Missing required -id flag")
+	}
 
 	b := master.NewBackup()
 
@@ -172,7 +175,7 @@ func main() {
 						id := m.ClientList[lost.Addr].ID
 						m.RemoveClient(lost.Addr)
 						if len(m.ClientList) == 0 {
-							panic("Loss of internet")
+							log.Fatal("Loss of internet")
 						} else {
 							if lost.Addr == m.SuccessorAddr {
 								m.HasSuccessor = false
