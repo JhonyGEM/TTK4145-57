@@ -16,7 +16,7 @@ const (
 	Undefined ElevatorState = iota
 	Idle
 	Moving
-	Door_open
+	DoorOpen
 )
 
 type Pending struct {
@@ -25,72 +25,69 @@ type Pending struct {
 }
 
 type Elevator struct {
-	Current_state   ElevatorState
-	Current_floor   int
+	CurrentState    ElevatorState
+	CurrentFloor    int
 	Direction       elevio.MotorDirection
 	Obstruction     bool
 	Requests        [][]bool
-	Id              string
-	Is_succesor     bool
+	ID              string
+	IsSuccesor      bool
 	//Network
 	Connection      *network.Client
-	Is_connected    bool
-	Retry_counter   int
+	IsConnected     bool
+	RetryCounter    int
 	Sequence        int
 	Pending         map[string]*Pending    // key = uid
 	//Timers
-	Door_timer      *time.Timer
-	Door_timer_done bool
-	Reconnect_timer *time.Timer
-	Pending_ticker  *time.Ticker
+	DoorTimer       *time.Timer
+	DoorTimerDone   bool
+	ReconnectTimer  *time.Timer
+	PendingTicker   *time.Ticker
 }
 
-func New_elevator(id string, succesor bool) *Elevator {
+func NewElevator(id string, succesor bool) *Elevator {
 	elevator := &Elevator{
-		Current_state:   Undefined,
-		Current_floor:   -1,
-		Requests:        utilities.Create_request_arr(config.N_floors, config.N_buttons),
-		Id:              id,
-		Is_succesor:     succesor,
-		Is_connected:    false,
-		Retry_counter:   0,
-		Sequence:        0,
+		CurrentState:    Undefined,
+		CurrentFloor:   -1,
+		Requests:        utilities.NewRequests(config.N_floors, config.N_buttons),
+		ID:              id,
+		IsSuccesor:      succesor,
 		Pending:         make(map[string]*Pending),
-		Door_timer:      time.NewTimer(config.Open_duration),
-		Reconnect_timer: time.NewTimer(config.Reconnect_delay),
-		Pending_ticker:  time.NewTicker(config.Pending_check_rate),
+		DoorTimer:       time.NewTimer(config.Open_duration),
+		ReconnectTimer:  time.NewTimer(config.Reconnect_delay),
+		PendingTicker:   time.NewTicker(config.Pending_check_rate),
 	}
-	elevator.Door_timer.Stop()
-	elevator.Door_timer_done = false
+	elevator.DoorTimer.Stop()
+	elevator.DoorTimerDone = false
 
 	return elevator
 }
 
-func (e *Elevator) Handle_message(message network.Message, backup *master.Backup) {
+func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup) {
 	switch message.Header {
 	case network.OrderReceived:
-		log.Printf("Recieved order: floor %d, button %d", message.Payload.OrderFloor, message.Payload.OrderButton)
+		log.Printf("Recieved order: floor %d, button %v", message.Payload.OrderFloor, message.Payload.OrderButton)
 		e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
-		e.Step_FSM()
+		e.StepFSM()
 
 	case network.LightUpdate:
-		e.Update_lights(message.Payload.Lights)
+		e.UpdateLights(message.Payload.Lights)
 
 	case network.Backup:
 		log.Printf("Recieved: %v", message.Header)
-		backup.Cab_req = message.Payload.BackupCab
-		backup.Hall_req = message.Payload.BackupHall
+		backup.CabRequests = message.Payload.BackupCab
+		backup.HallRequests = message.Payload.BackupHall
 		e.Send(network.Message{Header: network.Ack, UID: message.UID})
 
 	case network.Ack:
 		_, ok := e.Pending[message.UID]
 		if ok {
 			delete(e.Pending, message.UID)
-			e.Save_pending()
+			e.SavePending()
 		}
 
 	case network.Succesor:
 		log.Print("Elevator is now successor \n")
-		e.Is_succesor = true
+		e.IsSuccesor = true
 	}
 }

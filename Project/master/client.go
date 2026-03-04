@@ -7,42 +7,38 @@ import (
 	"time"
 )
 
-func (ec *Elevator_client) Send(message network.Message) {
+func (ec *ElevatorClient) Send(message network.Message) {
 	if ec.Connection.Conn != nil {
 		ec.Connection.Send(message)
 	}
 }
 
-func (m *Master) Add_client(c *network.Client) {
-	elev := &Elevator_client{
+func (m *Master) AddClient(c *network.Client) {
+	elev := &ElevatorClient{
 		Connection:     c,
-		Current_floor:  0,
-		Previous_floor: 0,
-		Obstruction:    false,
-		Active_req:     0,
-		Task_timer:     time.NewTimer(config.Request_timeout),
+		TaskTimer:      time.NewTimer(config.Request_timeout),
 	}
-	elev.Task_timer.Stop()
-	m.Client_list[c.Addr] = elev
+	elev.TaskTimer.Stop()
+	m.ClientList[c.Addr] = elev
 	log.Printf("Client connected: %s", c.Addr)
 }
 
-func (m *Master) Remove_client(addr string) {
-	_, ok := m.Client_list[addr]
+func (m *Master) RemoveClient(addr string) {
+	_, ok := m.ClientList[addr]
 	if ok {
-		delete(m.Client_list, addr)
+		delete(m.ClientList, addr)
 		log.Printf("Client removed: %s", addr)
 	}
 }
 
 // Handles task timer for each client
-func (m *Master) Client_timer_handler() {
+func (m *Master) ClientTimerHandler() {
 	for {
-		for _, client := range m.Client_list {
-			if client.Task_timer != nil {
+		for _, client := range m.ClientList {
+			if client.TaskTimer != nil {
 				select {
-				case <-client.Task_timer.C:
-					client.Task_timer.Stop()
+				case <-client.TaskTimer.C:
+					client.TaskTimer.Stop()
 					client.Connection.Conn.Close()
 
 				default:

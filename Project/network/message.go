@@ -38,8 +38,8 @@ type Message struct {
 	UID     string                  `json:"uid,omitempty"`
 }
 
-func (h MessageType) String() string {
-	switch h {
+func (m MessageType) String() string {
+	switch m {
 	case OrderReceived:
 		return "OrderReceived"
 	case OrderFulfilled:
@@ -61,6 +61,6 @@ func (h MessageType) String() string {
 	case Ack:
 		return "Ack"
 	default:
-		return fmt.Sprintf("HeaderType(%d)", int(h))
+		return fmt.Sprintf("HeaderType(%d)", int(m))
 	}
 }

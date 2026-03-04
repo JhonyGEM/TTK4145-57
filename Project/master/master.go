@@ -10,41 +10,41 @@ import (
 )
 
 type Backup struct {
-	Hall_req [][]bool
-	Cab_req  []map[string]bool
+	HallRequests [][]bool
+	CabRequests  []map[string]bool
 }
 
-func New_backup() *Backup {
+func NewBackup() *Backup {
 	return &Backup{
-		Hall_req: utilities.Create_request_arr(config.N_floors, config.N_buttons),
-		Cab_req:  Create_cab_request_arr(config.N_floors),
+		HallRequests: utilities.NewRequests(config.N_floors, config.N_buttons),
+		CabRequests:  NewCabRequests(config.N_floors),
 	}
 }
 
 type Master struct {
-	Address				 string
-	Client_list 	     map[string]*Elevator_client	// key = address
-	Hall_requests        [][]bool
-	Hall_assignments     [][]string
-	Cab_requests         []map[string]bool
-	Has_successor        bool
-	Successor_addr       string
-	Sequence             int
-	Pending              map[string]*network.Message	// key = uid
-	Resend_ticker        *time.Ticker
+	IP				    string
+	ClientList 	        map[string]*ElevatorClient	// key = address
+	HallRequests        [][]bool
+	HallAssignments     [][]string
+	CabRequests         []map[string]bool
+	HasSuccessor        bool
+	SuccessorAddr       string
+	Sequence            int
+	Pending             map[string]*network.Message	// key = uid
+	ResendTicker        *time.Ticker
 }
 
-type Elevator_client struct {
+type ElevatorClient struct {
 	Connection 		*network.Client
 	ID 				string
-	Current_floor 	int
-	Previous_floor  int
+	CurrentFloor 	int
+	PreviousFloor   int
 	Obstruction 	bool
-	Active_req      int
-	Task_timer 		*time.Timer
+	ActiveReq       int
+	TaskTimer 		*time.Timer
 }
 
-func Create_cab_request_arr(floor int) []map[string]bool {
+func NewCabRequests(floor int) []map[string]bool {
 	cab_requests := make([]map[string]bool, floor)
 	for f := 0; f < floor; f++ {
 		cab_requests[f] = make(map[string]bool)
@@ -52,7 +52,7 @@ func Create_cab_request_arr(floor int) []map[string]bool {
 	return cab_requests
 }
 
-func create_hall_assignment_arr(floors, buttons int) [][]string {
+func NewHallAssignments(floors, buttons int) [][]string {
 	assignments := make([][]string, floors)
 	for f := 0; f < floors; f++ {
 		assignments[f] = make([]string, buttons)
@@ -60,26 +60,22 @@ func create_hall_assignment_arr(floors, buttons int) [][]string {
 	return assignments
 }
 
-func New_master() *Master {
+func NewMaster() *Master {
 	return &Master{
-		Address:    	  "",
-		Client_list :     make(map[string]*Elevator_client),
-		Hall_requests:    utilities.Create_request_arr(config.N_floors, config.N_buttons),
-		Hall_assignments: create_hall_assignment_arr(config.N_floors, config.N_buttons),
-		Cab_requests:     Create_cab_request_arr(config.N_floors),
-		Has_successor:    false,
-		Successor_addr:   "",
-		Sequence:		  0,
+		ClientList :      make(map[string]*ElevatorClient),
+		HallRequests:     utilities.NewRequests(config.N_floors, config.N_buttons),
+		HallAssignments:  NewHallAssignments(config.N_floors, config.N_buttons),
+		CabRequests:      NewCabRequests(config.N_floors),
 		Pending:          make(map[string]*network.Message),
-		Resend_ticker:    time.NewTicker(config.Resend_rate),
+		ResendTicker:     time.NewTicker(config.Resend_rate),
 	}
 }
 
-func (m *Master) Find_new_successor() {
-	for _, client := range m.Client_list {
-		if m.Address != client.Connection.Get_ip() {
-			m.Has_successor = true
-			m.Successor_addr = client.Connection.Addr
+func (m *Master) FindNewSuccessor() {
+	for _, client := range m.ClientList {
+		if m.IP != client.Connection.GetIP() {
+			m.HasSuccessor = true
+			m.SuccessorAddr = client.Connection.Addr
 			client.Send(network.Message{Header: network.Succesor})
 			break
 		}
@@ -87,49 +83,50 @@ func (m *Master) Find_new_successor() {
 	log.Print("No suitable successor found \n")
 }
 
-func (m *Master) Handle_message(message network.Message) {
+func (m *Master) HandleMessage(message network.Message) {
 	//log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
 	switch message.Header {
 	case network.OrderReceived:
-		if m.Has_successor {
-			if !m.Is_request_active(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
+		if m.HasSuccessor {
+			if !m.IsRequestActive(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
 				if message.Payload.OrderButton == elevio.BT_Cab {
-					m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = true
+					m.CabRequests[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = true
 				} else {
-					m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+					m.HallRequests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 				}
 				m.Pending[message.UID] = &message
-				m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
-																	 Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+				m.ClientList[m.SuccessorAddr].Send(network.Message{Header: network.Backup, 
+																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
 																	 UID: message.UID})
-
 			} else {
 				// Repeated request -> send ack to elevator to remove from pending list
-				m.Client_list[message.Address].Send(network.Message{Header: network.Ack, 
+				m.ClientList[message.Address].Send(network.Message{Header: network.Ack, 
 																	UID: message.UID})
 			}
 		}
 
 	case network.OrderFulfilled:
 		if message.Payload.OrderButton == elevio.BT_Cab {
-			m.Cab_requests[message.Payload.OrderFloor][m.Client_list[message.Address].ID] = false
+			m.CabRequests[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = false
 		} else {
-			m.Hall_requests[message.Payload.OrderFloor][message.Payload.OrderButton] = false
-			m.Hall_assignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
+			m.HallRequests[message.Payload.OrderFloor][message.Payload.OrderButton] = false
+			m.HallAssignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
 		}
-		m.Client_list[message.Address].Active_req--
+		m.ClientList[message.Address].ActiveReq--
 		
-		if m.Client_list[message.Address].Active_req == 0 {
-			m.Client_list[message.Address].Task_timer.Stop()
+		if m.ClientList[message.Address].ActiveReq > 0 {
+			if !m.ClientList[message.Address].Obstruction {
+				m.ClientList[message.Address].TaskTimer.Reset(config.Request_timeout)
+			}
 		} else {
-			m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
+			m.ClientList[message.Address].TaskTimer.Stop()
 		}
 
-		if m.Has_successor {
-			message.UID = utilities.Gen_uid("master", m.Sequence)
+		if m.HasSuccessor {
+			message.UID = utilities.GenUID("master", m.Sequence)
 			m.Sequence++
-			m.Client_list[m.Successor_addr].Send(network.Message{Header: network.Backup, 
-																Payload: &network.MessagePayload{BackupHall: m.Hall_requests, BackupCab: m.Cab_requests}, 
+			m.ClientList[m.SuccessorAddr].Send(network.Message{Header: network.Backup, 
+																Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
 																UID: message.UID})
 			m.Pending[message.UID] = &message
 		}
@@ -137,40 +134,40 @@ func (m *Master) Handle_message(message network.Message) {
 	case network.Ack:
 		_, ok := m.Pending[message.UID]
 		if ok {
-			pend_msg := m.Pending[message.UID]
-			switch pend_msg.Header {
+			pend := m.Pending[message.UID]
+			switch pend.Header {
 			case network.OrderReceived:
-				m.Distribute_request(pend_msg.Payload.OrderFloor, pend_msg.Payload.OrderButton, pend_msg.Address)
-				m.Client_list[pend_msg.Address].Send(network.Message{Header: network.Ack, 
-																	 UID: pend_msg.UID})
-				delete(m.Pending, pend_msg.UID)
+				m.DistributeRequest(pend.Payload.OrderFloor, pend.Payload.OrderButton, pend.Address)
+				m.ClientList[pend.Address].Send(network.Message{Header: network.Ack, 
+																	 UID: pend.UID})
+				delete(m.Pending, pend.UID)
 
 			case network.OrderFulfilled:
-				m.Send_light_update()
-				delete(m.Pending, pend_msg.UID)
+				m.SendLightUpdate()
+				delete(m.Pending, pend.UID)
 			}
 		}
 
 	case network.FloorUpdate:
-		m.Client_list[message.Address].Previous_floor = m.Client_list[message.Address].Current_floor
-		m.Client_list[message.Address].Current_floor = message.Payload.CurrentFloor
+		m.ClientList[message.Address].PreviousFloor = m.ClientList[message.Address].CurrentFloor
+		m.ClientList[message.Address].CurrentFloor = message.Payload.CurrentFloor
 
 	case network.ObstructionUpdate:
-		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
+		m.ClientList[message.Address].Obstruction = message.Payload.Obstruction
 		if message.Payload.Obstruction {
-			m.Client_list[message.Address].Task_timer.Stop()
+			m.ClientList[message.Address].TaskTimer.Stop()
 		} else {
-			if m.Client_list[message.Address].Active_req > 0 {
-				m.Client_list[message.Address].Task_timer.Reset(config.Request_timeout)
+			if m.ClientList[message.Address].ActiveReq > 0 {
+				m.ClientList[message.Address].TaskTimer.Reset(config.Request_timeout)
 			}
 		}
 
 	case network.ClientInfo:
-		m.Client_list[message.Address].ID = message.Payload.ID
-		m.Client_list[message.Address].Current_floor = message.Payload.CurrentFloor
-		m.Client_list[message.Address].Previous_floor = message.Payload.CurrentFloor
-		m.Client_list[message.Address].Obstruction = message.Payload.Obstruction
-		m.Resend_cab_request(message.Address)
+		m.ClientList[message.Address].ID = message.Payload.ID
+		m.ClientList[message.Address].CurrentFloor = message.Payload.CurrentFloor
+		m.ClientList[message.Address].PreviousFloor = message.Payload.CurrentFloor
+		m.ClientList[message.Address].Obstruction = message.Payload.Obstruction
+		m.ResendCabRequest(message.Address)
 	}
 	//m.Print()
 }

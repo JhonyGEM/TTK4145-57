@@ -8,17 +8,17 @@ import (
 	"time"
 )
 
-func Create_request_arr(rows, cols int) [][]bool {
-	request := make([][]bool, rows)
+func NewRequests(rows, cols int) [][]bool {
+	requests := make([][]bool, rows)
 
-	for i := range request {
-		request[i] = make([]bool, cols)
+	for i := range requests {
+		requests[i] = make([]bool, cols)
 	}
 
-	return request
+	return requests
 }
 
-func Start_new_instance(id string) {
+func StartNewInstance(id string) {
 	switch runtime.GOOS {
 	case "windows":
 		exec.Command("cmd", "/C", "start", "powershell", "go", "run", "main.go", fmt.Sprintf("-id=%s", id)).Run()
@@ -36,6 +36,6 @@ func Abs(x int) int {
 	return x
 }
 
-func Gen_uid(client_id string, sequence int) string {
-	return fmt.Sprintf("%s-%d-%d", client_id, sequence, time.Now().UnixNano())
+func GenUID(clientID string, sequence int) string {
+	return fmt.Sprintf("%s-%d-%d", clientID, sequence, time.Now().UnixNano())
 }

@@ -37,16 +37,16 @@ func main() {
 	id := flag.String("id", "", "ID value")
 	flag.Parse()
 
-	b := master.New_backup()
+	b := master.NewBackup()
 
 	for {
 		switch  state {
 		case StateElevator:
 			log.Printf("Starting elevator \n")
 
-			e := elevator.New_elevator(*id, *succesor)
+			e := elevator.NewElevator(*id, *succesor)
 			elevio.Init("localhost:15657", config.N_floors)
-			prev_btn := elevio.ButtonEvent{Floor: -1, Button: -1}
+			prevBtn := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
 			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
@@ -62,133 +62,132 @@ func main() {
 			go elevio.PollButtons(drv_buttons, quitChan, &wg)
 			go elevio.PollFloorSensor(drv_floors, quitChan, &wg)
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan, &wg)
-			go e.Timer_handler(msgChan, lossChan, quitChan, pendChan, &wg)
+			go e.TimerHandler(msgChan, lossChan, quitChan, pendChan, &wg)
 
-			e.Load_pending()
-			e.Step_FSM()
+			e.LoadPending()
+			e.StepFSM()
 
 			for state == StateElevator {
 				select {
 				case floor := <-drv_floors:
 					if floor != -1 {
-						e.Current_floor = floor
+						e.CurrentFloor = floor
 						elevio.SetFloorIndicator(floor)
-						e.Step_FSM()
-						if e.Is_connected {
+						e.StepFSM()
+						if e.IsConnected {
 							e.Send(network.Message{Header: network.FloorUpdate, 
-												   Payload: &network.MessagePayload{CurrentFloor: e.Current_floor}})
+												   Payload: &network.MessagePayload{CurrentFloor: e.CurrentFloor}})
 						}
 					}
 				
 				case btn := <-drv_buttons:
-					if prev_btn != btn {
-						prev_btn = btn
-						if e.Is_connected {
+					if prevBtn != btn {
+						prevBtn = btn
+						if e.IsConnected {
 							message := network.Message{Header: network.OrderReceived, 
 													   Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, 
-													   UID: utilities.Gen_uid(e.Id, e.Sequence)}
+													   UID: utilities.GenUID(e.ID, e.Sequence)}
 							e.Send(message)
 							e.Sequence++
 							e.Pending[message.UID] = &elevator.Pending{Message: message, Timestamp: time.Now()}
-							e.Save_pending()
+							e.SavePending()
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
-								e.Update_lights(e.Requests)
-								e.Step_FSM()
+								e.UpdateLights(e.Requests)
+								e.StepFSM()
 							} 
 						}
 					}
 
 				case obs := <-drv_obstruction:
 					e.Obstruction = obs
-					e.Step_FSM()
-					if e.Is_connected {
+					e.StepFSM()
+					if e.IsConnected {
 						e.Send(network.Message{Header: network.ObstructionUpdate, 
 											   Payload: &network.MessagePayload{Obstruction: e.Obstruction}})
 					}
 
-				case <-e.Door_timer.C:
-					e.Door_timer.Stop()
-					e.Door_timer_done = true
-					e.Step_FSM()
+				case <-e.DoorTimer.C:
+					e.DoorTimer.Stop()
+					e.DoorTimerDone = true
+					e.StepFSM()
 
 				case <-lossChan:
 					log.Print("Disconnected from server \n")
-					e.Is_connected = false
+					e.IsConnected = false
 					e.Connection = &network.Client{}
-					e.Reconnect_timer.Reset(config.Reconnect_delay)
-					e.Remove_hall_requests()
-					e.Step_FSM()
+					e.ReconnectTimer.Reset(config.Reconnect_delay)
+					e.RemoveHallRequests()
+					e.StepFSM()
 
 				case message := <-msgChan:
-					e.Handle_message(message, b)
+					e.HandleMessage(message, b)
 
 				case <-quitChan:
 					state = StateMaster
-					utilities.Start_new_instance(e.Id)
+					utilities.StartNewInstance(e.ID)
 					continue
 
 				case uid := <-pendChan:
-					log.Println("Resending pending")
 					e.Send(e.Pending[uid].Message)
 					e.Pending[uid].Timestamp = time.Now()
-					e.Save_pending()
+					e.SavePending()
 				}
 			}
 
 		case StateMaster:
 			log.Printf("Starting master \n")
 
-			m := master.New_master()
-			m.Cab_requests = b.Cab_req
-			m.Hall_requests = b.Hall_req
+			m := master.NewMaster()
+			m.CabRequests = b.CabRequests
+			m.HallRequests = b.HallRequests
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 			
-			go network.Start_server(lossChan, newChan, msgChan)
-			go m.Client_timer_handler()
+			go network.StartServer(lossChan, newChan, msgChan)
+			go m.ClientTimerHandler()
 
-			for m.Address == "" {
-				if addr, err := network.Discover_server(); err == nil {
-					m.Address, _, _ = net.SplitHostPort(addr)
+			for m.IP == "" {
+				if addr, err := network.DiscoverServer(); err == nil {
+					m.IP, _, _ = net.SplitHostPort(addr)
 				}
 			}
 
 			for {
 				select {
 					case new := <-newChan:
-						m.Add_client(new)
-						if !m.Has_successor && m.Address == new.Get_ip() {
-							m.Has_successor = true
-							m.Successor_addr = new.Addr
-							m.Client_list[new.Addr].Send(network.Message{Header: network.Succesor})
+						m.AddClient(new)
+						if !m.HasSuccessor && m.IP == new.GetIP() {
+							m.HasSuccessor = true
+							m.SuccessorAddr = new.Addr
+							m.ClientList[new.Addr].Send(network.Message{Header: network.Succesor})
 						}
-						m.Resend_cab_request(new.Addr)
-						m.Send_light_update()
+						m.ResendCabRequest(new.Addr)
+						m.SendLightUpdate()
 
 					case lost := <-lossChan:
-						id := m.Client_list[lost.Addr].ID
-						m.Remove_client(lost.Addr)
-						if len(m.Client_list) == 0 {
+						id := m.ClientList[lost.Addr].ID
+						m.RemoveClient(lost.Addr)
+						if len(m.ClientList) == 0 {
 							panic("Loss of internet")
 						} else {
-							if lost.Addr == m.Successor_addr {
-								m.Has_successor = false
-								m.Successor_addr = ""
-								m.Find_new_successor()
+							if lost.Addr == m.SuccessorAddr {
+								m.HasSuccessor = false
+								m.SuccessorAddr = ""
+								m.FindNewSuccessor()
 							}
-							m.Redistribute_hall_request(id)
+							m.RedistributeHallRequest(id)
 						}
 
 					case message := <-msgChan:
-						m.Handle_message(message)
+						m.HandleMessage(message)
 
-					case <-m.Resend_ticker.C:
-						if m.Has_successor && len(m.Client_list) > 0 {
-							m.Resend_hall_request() 
+					case <-m.ResendTicker.C:
+						if m.HasSuccessor && len(m.ClientList) > 0 {
+							m.ResendHallRequest() 
 						} 
 				}
 			}

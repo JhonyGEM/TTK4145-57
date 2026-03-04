@@ -7,18 +7,18 @@ import (
 	"project/network"
 )
 
-func (m *Master) select_optimal_elevator(floor int) string {
+func (m *Master) selectOptimalElevator(floor int) string {
 	chosen_addr := ""
 	lowest_cost := 9999
 
-	for _, client := range m.Client_list {
-		curr_floor := client.Current_floor
-		cost := utilities.Abs(curr_floor - floor) + client.Active_req * config.Cost_penalty
+	for _, client := range m.ClientList {
+		curr_floor := client.CurrentFloor
+		cost := utilities.Abs(curr_floor - floor) + client.ActiveReq * config.Cost_penalty
 		
-		if client.Active_req > 0 {
+		if client.ActiveReq > 0 {
 			for f := 0; f < config.N_floors; f++ {
 				for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
-					if m.Hall_requests[f][b] && m.Hall_assignments[f][b] == client.ID {
+					if m.HallRequests[f][b] && m.HallAssignments[f][b] == client.ID {
 						cost += utilities.Abs(curr_floor - f)
 						curr_floor = f
 					}
@@ -35,72 +35,72 @@ func (m *Master) select_optimal_elevator(floor int) string {
 	return chosen_addr
 }
 
-func (m *Master) Is_request_active(floor int, button elevio.ButtonType, addr string) bool {
+func (m *Master) IsRequestActive(floor int, button elevio.ButtonType, addr string) bool {
 	if button == elevio.BT_Cab {
-		return m.Cab_requests[floor][m.Client_list[addr].ID]
+		return m.CabRequests[floor][m.ClientList[addr].ID]
 	} else {
-		return m.Hall_requests[floor][button]
+		return m.HallRequests[floor][button]
 	}
 }
 
-func (m *Master) Distribute_request(floor int, button elevio.ButtonType, addr string) {
+func (m *Master) DistributeRequest(floor int, button elevio.ButtonType, addr string) {
 	if button == elevio.BT_Cab {
-		m.Client_list[addr].Active_req++
-		m.Client_list[addr].Send(network.Message{Header: network.OrderReceived, 
+		m.ClientList[addr].ActiveReq++
+		m.ClientList[addr].Send(network.Message{Header: network.OrderReceived, 
 												 Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
-		if !m.Client_list[addr].Obstruction {
-			m.Client_list[addr].Task_timer.Reset(config.Request_timeout)
+		if !m.ClientList[addr].Obstruction {
+			m.ClientList[addr].TaskTimer.Reset(config.Request_timeout)
 		}
 	} else {
-		client_addr := m.select_optimal_elevator(floor)
+		client_addr := m.selectOptimalElevator(floor)
 		if client_addr != "" {
-			m.Hall_assignments[floor][button] = m.Client_list[client_addr].ID
-			m.Client_list[client_addr].Active_req++
-			m.Client_list[client_addr].Send(network.Message{Header: network.OrderReceived, 
+			m.HallAssignments[floor][button] = m.ClientList[client_addr].ID
+			m.ClientList[client_addr].ActiveReq++
+			m.ClientList[client_addr].Send(network.Message{Header: network.OrderReceived, 
 															Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
-			if !m.Client_list[client_addr].Obstruction {
-				m.Client_list[client_addr].Task_timer.Reset(config.Request_timeout)
+			if !m.ClientList[client_addr].Obstruction {
+				m.ClientList[client_addr].TaskTimer.Reset(config.Request_timeout)
 			}
 		}
 	}
-	m.Send_light_update()
+	m.SendLightUpdate()
 }
 
-func (m *Master) Redistribute_hall_request(id string) {
+func (m *Master) RedistributeHallRequest(id string) {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
-			if m.Hall_assignments[f][b] == id {
-				m.Distribute_request(f, b, "")
+			if m.HallAssignments[f][b] == id {
+				m.DistributeRequest(f, b, "")
 			}
 		}
 	}
 }
 
-func (m *Master) Resend_cab_request(addr string) {
-	id := m.Client_list[addr].ID
+func (m *Master) ResendCabRequest(addr string) {
+	id := m.ClientList[addr].ID
 	for f := 0; f < config.N_floors; f++ {
-		if m.Cab_requests[f][id] {
-			m.Distribute_request(f, elevio.BT_Cab, addr)
+		if m.CabRequests[f][id] {
+			m.DistributeRequest(f, elevio.BT_Cab, addr)
 		}
 	}
 }
 
-func (m *Master) Resend_hall_request() {
+func (m *Master) ResendHallRequest() {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
-			if m.Hall_requests[f][b] && m.Hall_assignments[f][b] == "" {
-				m.Distribute_request(f, b, "")
+			if m.HallRequests[f][b] && m.HallAssignments[f][b] == "" {
+				m.DistributeRequest(f, b, "")
 			}
 		}
 	}
 }
 
-func (m *Master) Send_light_update() {
-	for _, elev := range m.Client_list {
-		light := utilities.Create_request_arr(config.N_floors, config.N_buttons)
+func (m *Master) SendLightUpdate() {
+	for _, elev := range m.ClientList {
+		light := utilities.NewRequests(config.N_floors, config.N_buttons)
 		for f := 0; f < config.N_floors; f++ {
-			copy(light[f], m.Hall_requests[f])
-			light[f][elevio.BT_Cab] = m.Cab_requests[f][elev.ID]
+			copy(light[f], m.HallRequests[f])
+			light[f][elevio.BT_Cab] = m.CabRequests[f][elev.ID]
 		}
 		elev.Send(network.Message{Header: network.LightUpdate, 
 								  Payload: &network.MessagePayload{Lights: light}})

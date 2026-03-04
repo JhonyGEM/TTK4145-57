@@ -6,7 +6,7 @@ import (
 	"project/network"
 )
 
-func (e *Elevator) request_pending() bool {
+func (e *Elevator) requestPending() bool {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
 			if e.Requests[f][b] {
@@ -17,8 +17,8 @@ func (e *Elevator) request_pending() bool {
 	return false
 }
 
-func (e *Elevator) request_above() bool {
-	for f := e.Current_floor + 1; f < config.N_floors; f++ {
+func (e *Elevator) requestAbove() bool {
+	for f := e.CurrentFloor + 1; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
 			if e.Requests[f][b] {
 				return true
@@ -28,8 +28,8 @@ func (e *Elevator) request_above() bool {
 	return false
 }
 
-func (e *Elevator) request_below() bool {
-	for f := 0; f < e.Current_floor; f++ {
+func (e *Elevator) requestBelow() bool {
+	for f := 0; f < e.CurrentFloor; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
 			if e.Requests[f][b] {
 				return true
@@ -39,65 +39,65 @@ func (e *Elevator) request_below() bool {
 	return false
 }
 
-func (e *Elevator) request_here() bool {
+func (e *Elevator) requestHere() bool {
 	for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-		if e.Requests[e.Current_floor][b] {
+		if e.Requests[e.CurrentFloor][b] {
 			return true
 		}
 	}
 	return false
 }
 
-func (e *Elevator) Remove_hall_requests() {
+func (e *Elevator) RemoveHallRequests() {
 	for f := 0; f < config.N_floors; f++ {
 		e.Requests[f][elevio.BT_HallUp] = false
 		e.Requests[f][elevio.BT_HallDown] = false
 	}
 }
 
-func (e *Elevator) should_stop() bool {
+func (e *Elevator) shouldStop() bool {
 	switch e.Direction {
 	case elevio.MD_Down:
-		return e.Requests[e.Current_floor][elevio.BT_HallDown] || e.Requests[e.Current_floor][elevio.BT_Cab] || !e.request_below()
+		return e.Requests[e.CurrentFloor][elevio.BT_HallDown] || e.Requests[e.CurrentFloor][elevio.BT_Cab] || !e.requestBelow()
 
 	case elevio.MD_Up:
-		return e.Requests[e.Current_floor][elevio.BT_HallUp] || e.Requests[e.Current_floor][elevio.BT_Cab] || !e.request_above()
+		return e.Requests[e.CurrentFloor][elevio.BT_HallUp] || e.Requests[e.CurrentFloor][elevio.BT_Cab] || !e.requestAbove()
 
 	case elevio.MD_Stop:
-		return !e.request_below() && !e.request_above()
+		return !e.requestBelow() && !e.requestAbove()
 	
 	default:
 		return false
 	}
 }
 
-func (e *Elevator) should_clear() bool {
-	return ((e.Direction == elevio.MD_Up && e.Requests[e.Current_floor][elevio.BT_HallUp]) ||
-		    (e.Direction == elevio.MD_Down && e.Requests[e.Current_floor][elevio.BT_HallDown]) ||
+func (e *Elevator) shouldClear() bool {
+	return ((e.Direction == elevio.MD_Up && e.Requests[e.CurrentFloor][elevio.BT_HallUp]) ||
+		    (e.Direction == elevio.MD_Down && e.Requests[e.CurrentFloor][elevio.BT_HallDown]) ||
 		    e.Direction == elevio.MD_Stop ||
-		    e.Requests[e.Current_floor][elevio.BT_Cab])
+		    e.Requests[e.CurrentFloor][elevio.BT_Cab])
 }
 
-func (e *Elevator) clear_request(floor int, button elevio.ButtonType) {
+func (e *Elevator) clearRequest(floor int, button elevio.ButtonType) {
 	if !e.Requests[floor][button] {
 		return
 	}
 	e.Requests[floor][button] = false
-	if e.Is_connected {
+	if e.IsConnected {
 		e.Send(network.Message{Header: network.OrderFulfilled, 
 							   Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 	}
 }
 
-func (e *Elevator) clear_at_current_floor() {
-	e.clear_request(e.Current_floor, elevio.BT_Cab)
+func (e *Elevator) clearAtCurrentFloor() {
+	e.clearRequest(e.CurrentFloor, elevio.BT_Cab)
 
-	if (e.request_above() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
-		e.clear_request(e.Current_floor, elevio.BT_HallUp)
-	} else if (e.request_below() && (e.Requests[e.Current_floor][elevio.BT_HallUp] && e.Requests[e.Current_floor][elevio.BT_HallDown])) {
-		e.clear_request(e.Current_floor, elevio.BT_HallDown)
+	if (e.requestAbove() && (e.Requests[e.CurrentFloor][elevio.BT_HallUp] && e.Requests[e.CurrentFloor][elevio.BT_HallDown])) {
+		e.clearRequest(e.CurrentFloor, elevio.BT_HallUp)
+	} else if (e.requestBelow() && (e.Requests[e.CurrentFloor][elevio.BT_HallUp] && e.Requests[e.CurrentFloor][elevio.BT_HallDown])) {
+		e.clearRequest(e.CurrentFloor, elevio.BT_HallDown)
 	} else {
-		e.clear_request(e.Current_floor, elevio.BT_HallUp)
-		e.clear_request(e.Current_floor, elevio.BT_HallDown)
+		e.clearRequest(e.CurrentFloor, elevio.BT_HallUp)
+		e.clearRequest(e.CurrentFloor, elevio.BT_HallDown)
 	}
 }

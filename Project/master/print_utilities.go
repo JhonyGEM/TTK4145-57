@@ -7,39 +7,39 @@ import (
 	"strings"
 )
 
-func print_separator() {
+func printSeparator() {
 	cell := "+" + strings.Repeat("-", config.Cell_width + 1)
 	fmt.Println(strings.Repeat(cell, config.N_floors) + "+")
 }
 
-func (m *Master) print_hall_request() {
+func (m *Master) printHallRequest() {
 	fmt.Print("Hall request \n")
-	print_separator()
+	printSeparator()
 	for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 		for f := 0; f < config.N_floors; f++ {
 			if (f == 3 && b == elevio.BT_HallUp) || (f == 0 && b == elevio.BT_HallDown) {
 				fmt.Printf("| %-*s", config.Cell_width, " ")
 				continue
 			}
-			if !m.Hall_requests[f][b] {
+			if !m.HallRequests[f][b] {
 				fmt.Printf("| %-*s", config.Cell_width, "-")
-			} else if m.Hall_assignments[f][b] == "" {
+			} else if m.HallAssignments[f][b] == "" {
 				fmt.Printf("| %-*s", config.Cell_width, "*")
 			} else {
-				fmt.Printf("| %-*s", config.Cell_width, m.Hall_assignments[f][b])
+				fmt.Printf("| %-*s", config.Cell_width, m.HallAssignments[f][b])
 			}
 		}
 		fmt.Println("|")
 	}
-	print_separator()
+	printSeparator()
 }
 
-func (m *Master) print_cab_request() {
+func (m *Master) printCabRequest() {
 	fmt.Print("Cab request \n")
-	print_separator()
-	for _, client := range m.Client_list {
+	printSeparator()
+	for _, client := range m.ClientList {
 		for f := 0; f < config.N_floors; f++ {
-			if m.Cab_requests[f][client.ID] {
+			if m.CabRequests[f][client.ID] {
 				fmt.Printf("| %-*s", config.Cell_width, client.ID)
 			} else {
 				fmt.Printf("| %-*s", config.Cell_width, "-")
@@ -47,22 +47,22 @@ func (m *Master) print_cab_request() {
 		}
 		fmt.Println("|")
 	}
-	print_separator()
+	printSeparator()
 }
 
-func (m *Master) print_client_list() {
+func (m *Master) printClientList() {
 	fmt.Print("Client list \n")
-	print_separator()
+	printSeparator()
 	fmt.Printf("| %-*s| %-*s| %-*s| %-*s|\n", config.Cell_width, "ID", config.Cell_width, "Floor", config.Cell_width, "Obst", config.Cell_width, "AR")
-	print_separator()
-	for _, client := range m.Client_list {
-		fmt.Printf("| %-*s| %-*d| %-*t| %-*d|\n", config.Cell_width, client.ID, config.Cell_width, client.Current_floor, config.Cell_width, client.Obstruction, config.Cell_width, client.Active_req)
+	printSeparator()
+	for _, client := range m.ClientList {
+		fmt.Printf("| %-*s| %-*d| %-*t| %-*d|\n", config.Cell_width, client.ID, config.Cell_width, client.CurrentFloor, config.Cell_width, client.Obstruction, config.Cell_width, client.ActiveReq)
 	}
-	print_separator()
+	printSeparator()
 }
 
 func (m *Master) Print() {
-	m.print_client_list()
-	m.print_hall_request()
-	m.print_cab_request()
+	m.printClientList()
+	m.printHallRequest()
+	m.printCabRequest()
 }

@@ -30,6 +30,19 @@ const (
 	BT_Cab                 = 2
 )
 
+func (b ButtonType) String() string {
+	switch b {
+	case BT_HallUp:
+		return "Hall up"
+	case BT_HallDown:
+		return "Hall down"
+	case BT_Cab:
+		return "Cab"
+	default:
+		return fmt.Sprintf("ButtonType(%d)", int(b))
+	}
+}
+
 type ButtonEvent struct {
 	Floor  int
 	Button ButtonType

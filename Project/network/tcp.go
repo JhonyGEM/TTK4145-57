@@ -19,7 +19,7 @@ type Client struct {
 	Stop   chan struct{}
 }
 
-func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<- Message) {
+func StartServer(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<- Message) {
 	go broadcast()
 
 	addr, err := net.ResolveTCPAddr("tcp", config.TCP_port)
@@ -41,14 +41,14 @@ func Start_server(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<
 			continue
 		}
 
-		client := New_client(conn)
+		client := NewClient(conn)
 		newChan<- client
 		go client.Listen(msgChan, lossChan)
 		go client.Heartbeat()
 	}
 }
 
-func New_client(conn *net.TCPConn) *Client {
+func NewClient(conn *net.TCPConn) *Client {
     return &Client{
         Conn:     conn,
         Reader:   bufio.NewReader(conn),
@@ -59,7 +59,7 @@ func New_client(conn *net.TCPConn) *Client {
     }
 }
 
-func (c *Client) Get_ip() string {
+func (c *Client) GetIP() string {
 	addr, _, _ := net.SplitHostPort(c.Addr)
 	return addr
 }
@@ -134,17 +134,17 @@ func (c *Client) Heartbeat() {
 	}
 }
 
-func Connect(server_addr string) (*net.TCPConn, error) {
+func Connect(serverAddr string) (*net.TCPConn, error) {
 	dialer := net.Dialer{Timeout: config.Dialer_timeout}
 
-	conn, err := dialer.Dial("tcp", server_addr)
+	conn, err := dialer.Dial("tcp", serverAddr)
 	if err != nil {
 		return nil, err
 	}
 	return conn.(*net.TCPConn), nil
 }
 
-func Has_internet_connection() bool {
+func HasInternetConnection() bool {
 	conn, err := net.DialTimeout("tcp", "8.8.8.8:53", config.Dialer_timeout)
 	if err != nil {
 		return false

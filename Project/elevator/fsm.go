@@ -5,84 +5,84 @@ import (
 	"project/elevio"
 )
 
-func (e *Elevator) Step_FSM() {
-	switch e.Current_state {
+func (e *Elevator) StepFSM() {
+	switch e.CurrentState {
 	case Undefined:
-		e.Update_lights(e.Requests)
+		e.UpdateLights(e.Requests)
 		elevio.SetDoorOpenLamp(false)
 
 		if elevio.GetFloor() == -1 {
-			e.update_direction(elevio.MD_Down)
+			e.updateDirection(elevio.MD_Down)
 		} else {
-			e.update_direction(elevio.MD_Stop)
-			e.Update_state(Idle)
+			e.updateDirection(elevio.MD_Stop)
+			e.UpdateState(Idle)
 		}
 
 	case Idle:
-		if e.request_pending() {
-			if e.request_here() {
-				e.clear_at_current_floor()
-				if !e.Is_connected {
-					e.Update_lights(e.Requests)
+		if e.requestPending() {
+			if e.requestHere() {
+				e.clearAtCurrentFloor()
+				if !e.IsConnected {
+					e.UpdateLights(e.Requests)
 				}
-				e.Door_timer.Reset(config.Open_duration)
-				e.Update_state(Door_open)
+				e.DoorTimer.Reset(config.Open_duration)
+				e.UpdateState(DoorOpen)
 			} else {
-				e.Update_state(Moving)
+				e.UpdateState(Moving)
 			}
 		}
 
 	case Moving:
-		if (e.should_stop() && elevio.GetFloor() != -1) {
-			e.update_direction(elevio.MD_Stop)
-			if e.should_clear() {
-				e.clear_at_current_floor()
-				if !e.Is_connected {
-					e.Update_lights(e.Requests)
+		if (e.shouldStop() && elevio.GetFloor() != -1) {
+			e.updateDirection(elevio.MD_Stop)
+			if e.shouldClear() {
+				e.clearAtCurrentFloor()
+				if !e.IsConnected {
+					e.UpdateLights(e.Requests)
 				}
 			}
-			e.Door_timer.Reset(config.Open_duration)	
-			e.Update_state(Door_open)
+			e.DoorTimer.Reset(config.Open_duration)	
+			e.UpdateState(DoorOpen)
 		} else {
-			e.choose_direction()
+			e.chooseDirection()
 		}
 
-	case Door_open:
+	case DoorOpen:
 		elevio.SetDoorOpenLamp(true)
 
 		if e.Obstruction {
-			e.Door_timer.Reset(config.Open_duration)
-			e.Door_timer_done = false
+			e.DoorTimer.Reset(config.Open_duration)
+			e.DoorTimerDone = false
 		} else {
-			if e.Door_timer_done {
+			if e.DoorTimerDone {
 				elevio.SetDoorOpenLamp(false)
-				e.Door_timer_done = false
-				if e.request_pending() {
-					e.Update_state(Moving)
+				e.DoorTimerDone = false
+				if e.requestPending() {
+					e.UpdateState(Moving)
 				} else {
-					e.Update_state(Idle)
+					e.UpdateState(Idle)
 				}
 			}
 		}
 	}
 }
 
-func (e *Elevator) Update_state(new_state ElevatorState) {
-	e.Current_state = new_state
-	e.Step_FSM()
+func (e *Elevator) UpdateState(newState ElevatorState) {
+	e.CurrentState = newState
+	e.StepFSM()
 }
 
-func (e *Elevator) update_direction(new_direction elevio.MotorDirection) {
-	e.Direction = new_direction
-	elevio.SetMotorDirection(new_direction)
+func (e *Elevator) updateDirection(newDirection elevio.MotorDirection) {
+	e.Direction = newDirection
+	elevio.SetMotorDirection(newDirection)
 }
 
-func (e *Elevator) choose_direction() {
+func (e *Elevator) chooseDirection() {
 	switch e.Direction {
 	case elevio.MD_Up:
-		if e.request_above() {
+		if e.requestAbove() {
 			e.Direction = elevio.MD_Up
-		} else if e.request_below() {
+		} else if e.requestBelow() {
 			e.Direction = elevio.MD_Down
 		} else {
 			e.Direction = elevio.MD_Stop
@@ -90,9 +90,9 @@ func (e *Elevator) choose_direction() {
 		elevio.SetMotorDirection(e.Direction)
 	
 	case elevio.MD_Down:
-		if e.request_below() {
+		if e.requestBelow() {
 			e.Direction = elevio.MD_Down
-		} else if e.request_above() {
+		} else if e.requestAbove() {
 			e.Direction = elevio.MD_Up
 		} else {
 			e.Direction = elevio.MD_Stop
@@ -100,9 +100,9 @@ func (e *Elevator) choose_direction() {
 		elevio.SetMotorDirection(e.Direction)
 
 	case elevio.MD_Stop:
-		if e.request_above() {
+		if e.requestAbove() {
 			e.Direction = elevio.MD_Up
-		} else if e.request_below() {
+		} else if e.requestBelow() {
 			e.Direction = elevio.MD_Down
 		} else {
 			e.Direction = elevio.MD_Stop
