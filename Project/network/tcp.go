@@ -110,23 +110,23 @@ func (c *Client) Send(message Message) {
 }
 
 func (c *Client) Heartbeat() {
-	idle_timer := time.NewTimer(config.Heartbeat_interval)
-	defer idle_timer.Stop()
+	idleTimer := time.NewTimer(config.Heartbeat_interval)
+	defer idleTimer.Stop()
 
 	for {
 		select {
-		case <- idle_timer.C:
+		case <- idleTimer.C:
 			c.Send(Message{Header: Heartbeat})
-			idle_timer.Reset(config.Heartbeat_interval)
+			idleTimer.Reset(config.Heartbeat_interval)
 
 		case <- c.Activity:
-			if !idle_timer.Stop() {
+			if !idleTimer.Stop() {
 				select {
-				case <- idle_timer.C:
+				case <- idleTimer.C:
 				default:
 				}
 			}
-			idle_timer.Reset(config.Heartbeat_interval)
+			idleTimer.Reset(config.Heartbeat_interval)
 
 		case <- c.Stop:
 			return
