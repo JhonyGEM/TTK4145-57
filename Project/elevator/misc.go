@@ -29,11 +29,12 @@ func (e *Elevator) Send(message network.Message) {
 func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, pendChan chan<- string, wg *sync.WaitGroup) {
 	for {
 		select {
-			case <-e.ReconnectTimer.C:
+		case <-e.ReconnectTimer.C:
+			if network.HasInternetConnection() {
 				e.RetryCounter++
 				e.ReconnectTimer.Stop()
 
-				if e.RetryCounter > config.Max_retries && e.IsSuccesor && network.HasInternetConnection() {
+				if e.RetryCounter > config.Max_retries && e.IsSuccesor {
 					log.Print("Max tries reached, elevator becomes master \n")
 					close(quitChan)
 					wg.Wait()
@@ -53,23 +54,27 @@ func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- 
 					continue
 				}
 
-				e.RetryCounter = 0 
+				e.RetryCounter = 0
 				e.Connection = network.NewClient(conn)
 				e.IsConnected = true
-				e.Send(network.Message{Header: network.ClientInfo, 
-									   Payload: &network.MessagePayload{ID: e.ID, CurrentFloor: e.CurrentFloor, Obstruction: e.Obstruction}})
+				e.Send(network.Message{Header: network.ClientInfo,
+					Payload: &network.MessagePayload{ID: e.ID, CurrentFloor: e.CurrentFloor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
 				go e.Connection.Heartbeat()
 				log.Printf("Connected to server \n")
+			} else {
+				log.Print("No internet connection, retrying... \n")
+				e.ReconnectTimer.Reset(config.Reconnect_delay)
+			}
 
-			case <-e.PendingTicker.C:
-				if e.IsConnected && len(e.Pending) > 0 {
-					for _, pend_msg := range e.Pending {
-						if time.Since(pend_msg.Timestamp) > config.Pending_timeout {
-							pendChan <- pend_msg.Message.UID
-						}
+		case <-e.PendingTicker.C:
+			if e.IsConnected && len(e.Pending) > 0 {
+				for _, pend_msg := range e.Pending {
+					if time.Since(pend_msg.Timestamp) > config.Pending_timeout {
+						pendChan <- pend_msg.Message.UID
 					}
 				}
+			}
 		}
 	}
 }
