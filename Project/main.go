@@ -25,10 +25,8 @@ const (
 // System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
 // If master do not have successor, then it accepts orders but do not distribute them
 
-
 // TODO: Need to do
 // 1. Imporve code quality
-
 
 func main() {
 	state := StateElevator
@@ -37,13 +35,13 @@ func main() {
 	succesor := flag.Bool("succesor", false, "Succesor enable")
 	flag.Parse()
 	if *id == "" {
-    	log.Fatal("Missing required -id flag")
+		log.Fatal("Missing required -id flag")
 	}
 
 	b := master.NewBackup()
 
 	for {
-		switch  state {
+		switch state {
 		case StateElevator:
 			log.Printf("Starting elevator \n")
 
@@ -52,7 +50,7 @@ func main() {
 			prevBtn := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
-			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors * config.N_buttons)
+			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
 			drv_floors := make(chan int)
 			drv_obstruction := make(chan bool)
 
@@ -78,18 +76,18 @@ func main() {
 						elevio.SetFloorIndicator(floor)
 						e.StepFSM()
 						if e.IsConnected {
-							e.Send(network.Message{Header: network.FloorUpdate, 
-												   Payload: &network.MessagePayload{CurrentFloor: e.CurrentFloor}})
+							e.Send(network.Message{Header: network.FloorUpdate,
+								Payload: &network.MessagePayload{CurrentFloor: e.CurrentFloor}})
 						}
 					}
-				
+
 				case btn := <-drv_buttons:
 					if prevBtn != btn {
 						prevBtn = btn
 						if e.IsConnected {
-							message := network.Message{Header: network.OrderReceived, 
-													   Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button}, 
-													   UID: utilities.GenUID(e.ID, e.Sequence)}
+							message := network.Message{Header: network.OrderReceived,
+								Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button},
+								UID:     utilities.GenUID(e.ID, e.Sequence)}
 							e.Send(message)
 							e.Sequence++
 							e.Pending[message.UID] = &elevator.Pending{Message: message, Timestamp: time.Now()}
@@ -99,7 +97,7 @@ func main() {
 								e.Requests[btn.Floor][btn.Button] = true
 								e.UpdateLights(e.Requests)
 								e.StepFSM()
-							} 
+							}
 						}
 					}
 
@@ -107,8 +105,8 @@ func main() {
 					e.Obstruction = obs
 					e.StepFSM()
 					if e.IsConnected {
-						e.Send(network.Message{Header: network.ObstructionUpdate, 
-											   Payload: &network.MessagePayload{Obstruction: e.Obstruction}})
+						e.Send(network.Message{Header: network.ObstructionUpdate,
+							Payload: &network.MessagePayload{Obstruction: e.Obstruction}})
 					}
 
 				case <-e.DoorTimer.C:
@@ -149,7 +147,7 @@ func main() {
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
-			
+
 			go network.StartServer(lossChan, newChan, msgChan)
 			go m.ClientTimerHandler()
 
@@ -161,37 +159,37 @@ func main() {
 
 			for {
 				select {
-					case new := <-newChan:
-						m.AddClient(new)
-						if !m.HasSuccessor && m.IP == new.GetIP() {
-							m.HasSuccessor = true
-							m.SuccessorAddr = new.Addr
-							m.ClientList[new.Addr].Send(network.Message{Header: network.Succesor})
+				case new := <-newChan:
+					m.AddClient(new)
+					if !m.HasSuccessor && m.IP == new.GetIP() {
+						m.HasSuccessor = true
+						m.SuccessorAddr = new.Addr
+						m.ClientList[new.Addr].Send(network.Message{Header: network.Succesor})
+					}
+					m.ResendCabRequest(new.Addr)
+					m.SendLightUpdate()
+
+				case lost := <-lossChan:
+					id := m.ClientList[lost.Addr].ID
+					m.RemoveClient(lost.Addr)
+					if len(m.ClientList) == 0 {
+						log.Fatal("Loss of internet")
+					} else {
+						if lost.Addr == m.SuccessorAddr {
+							m.HasSuccessor = false
+							m.SuccessorAddr = ""
+							m.FindNewSuccessor()
 						}
-						m.ResendCabRequest(new.Addr)
-						m.SendLightUpdate()
+						m.RedistributeHallRequest(id)
+					}
 
-					case lost := <-lossChan:
-						id := m.ClientList[lost.Addr].ID
-						m.RemoveClient(lost.Addr)
-						if len(m.ClientList) == 0 {
-							log.Fatal("Loss of internet")
-						} else {
-							if lost.Addr == m.SuccessorAddr {
-								m.HasSuccessor = false
-								m.SuccessorAddr = ""
-								m.FindNewSuccessor()
-							}
-							m.RedistributeHallRequest(id)
-						}
+				case message := <-msgChan:
+					m.HandleMessage(message)
 
-					case message := <-msgChan:
-						m.HandleMessage(message)
-
-					case <-m.ResendTicker.C:
-						if m.HasSuccessor && len(m.ClientList) > 0 {
-							m.ResendHallRequest() 
-						} 
+				case <-m.ResendTicker.C:
+					if m.HasSuccessor && len(m.ClientList) > 0 {
+						m.ResendHallRequest()
+					}
 				}
 			}
 		}
