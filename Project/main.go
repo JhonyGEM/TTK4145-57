@@ -76,8 +76,10 @@ func main() {
 						elevio.SetFloorIndicator(floor)
 						e.StepFSM()
 						if e.IsConnected {
-							e.Send(network.Message{Header: network.FloorUpdate,
-								Payload: &network.MessagePayload{CurrentFloor: e.CurrentFloor}})
+							e.Send(network.Message{
+								Header: network.FloorUpdate,
+								Payload: &network.MessagePayload{
+									CurrentFloor: e.CurrentFloor}})
 						}
 					}
 
@@ -85,9 +87,11 @@ func main() {
 					if prevBtn != btn {
 						prevBtn = btn
 						if e.IsConnected {
-							message := network.Message{Header: network.OrderReceived,
-								Payload: &network.MessagePayload{OrderFloor: btn.Floor, OrderButton: btn.Button},
-								UID:     utilities.GenUID(e.ID, e.Sequence)}
+							message := network.Message{
+								Header: network.OrderReceived,
+								Payload: &network.MessagePayload{
+									OrderFloor: btn.Floor, OrderButton: btn.Button},
+								UID: utilities.GenUID(e.ID, e.Sequence)}
 							e.Send(message)
 							e.Sequence++
 							e.Pending[message.UID] = &elevator.Pending{Message: message, Timestamp: time.Now()}
@@ -105,8 +109,10 @@ func main() {
 					e.Obstruction = obs
 					e.StepFSM()
 					if e.IsConnected {
-						e.Send(network.Message{Header: network.ObstructionUpdate,
-							Payload: &network.MessagePayload{Obstruction: e.Obstruction}})
+						e.Send(network.Message{
+							Header: network.ObstructionUpdate,
+							Payload: &network.MessagePayload{
+								Obstruction: e.Obstruction}})
 					}
 
 				case <-e.DoorTimer.C:
