@@ -167,6 +167,7 @@ func main() {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
+					// Ok for testing, change to  m.IP != new.GetIP() in lab
 					if !m.HasSuccessor && m.IP == new.GetIP() {
 						m.HasSuccessor = true
 						m.SuccessorAddr = new.Addr
