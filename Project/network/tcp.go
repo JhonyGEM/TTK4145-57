@@ -152,3 +152,13 @@ func HasInternetConnection() bool {
 	conn.Close()
 	return true
 }
+
+func GetLocalIP() string {
+	conn, err := net.DialTimeout("tcp", "8.8.8.8:53", config.Dialer_timeout)
+	if err != nil {
+		return ""
+	}
+	ip, _, _ := net.SplitHostPort(conn.LocalAddr().String())
+	conn.Close()
+	return ip
+}

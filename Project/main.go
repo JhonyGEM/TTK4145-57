@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"log"
-	"net"
 	"project/config"
 	"project/elevator"
 	"project/elevio"
@@ -24,6 +23,7 @@ const (
 // TODO: Problems
 // System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
 // If master do not have successor, then it accepts orders but do not distribute them
+// (fixed) When pc 1 is master and pc 2 is succesor, if we turn off wifi on pc 1 then pc 2 disconnects and starts a new master, while pc 1 do not disconnects its elevator and the master is stil runing -> thus we have two masters
 
 // TODO: Need to do
 // 1. Imporve code quality
@@ -149,6 +149,7 @@ func main() {
 			m := master.NewMaster()
 			m.CabRequests = b.CabRequests
 			m.HallRequests = b.HallRequests
+			m.IP = network.GetLocalIP()
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lossChan := make(chan *network.Client, config.N_elevators)
@@ -157,18 +158,12 @@ func main() {
 			go network.StartServer(lossChan, newChan, msgChan)
 			go m.ClientTimerHandler()
 
-			for m.IP == "" {
-				if addr, err := network.DiscoverServer(); err == nil {
-					m.IP, _, _ = net.SplitHostPort(addr)
-				}
-			}
-
 			for {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
 					// Ok for testing, change to  m.IP != new.GetIP() in lab
-					if !m.HasSuccessor && m.IP == new.GetIP() {
+					if !m.HasSuccessor && m.IP != new.GetIP() {
 						m.HasSuccessor = true
 						m.SuccessorAddr = new.Addr
 						m.ClientList[new.Addr].Send(network.Message{Header: network.Succesor})
@@ -181,7 +176,14 @@ func main() {
 					m.RemoveClient(lost.Addr)
 					if len(m.ClientList) == 0 {
 						log.Fatal("Loss of internet")
-					} else {
+					} 
+					if len(m.ClientList) == 1 && !network.HasInternetConnection() {
+						for _, client := range m.ClientList {
+							client.Connection.Conn.Close()
+							break
+						}
+					}
+					if len(m.ClientList) > 0 {
 						if lost.Addr == m.SuccessorAddr {
 							m.HasSuccessor = false
 							m.SuccessorAddr = ""
