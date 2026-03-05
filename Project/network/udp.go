@@ -43,11 +43,11 @@ func DiscoverServer() (string, error) {
 	conn.SetReadDeadline(time.Now().Add(config.Search_timeout))
 
 	buffer := make([]byte, 1024)
-	n, addr, err := conn.ReadFromUDP(buffer)
+	_, addr, err = conn.ReadFromUDP(buffer)
 	if err != nil {
 		return "", err
 	}
-	log.Printf("Received broadcast from %s: %s\n", addr.IP, string(buffer[:n]))
+	//log.Printf("Received broadcast from %s: %s\n", addr.IP, string(buffer[:n]))
 
 	return fmt.Sprintf("%s" + config.TCP_port, addr.IP), nil
 }
