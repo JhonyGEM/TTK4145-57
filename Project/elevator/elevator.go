@@ -31,7 +31,7 @@ type Elevator struct {
 	Obstruction     bool
 	Requests        [][]bool
 	ID              string
-	IsSuccesor      bool
+	IsSuccessor      bool
 	//Network
 	Connection      *network.Client
 	IsConnected     bool
@@ -45,13 +45,13 @@ type Elevator struct {
 	PendingTicker   *time.Ticker
 }
 
-func NewElevator(id string, succesor bool) *Elevator {
+func NewElevator(id string, successor bool) *Elevator {
 	elevator := &Elevator{
 		CurrentState:    Undefined,
 		CurrentFloor:   -1,
 		Requests:        utilities.NewRequests(config.N_floors, config.N_buttons),
 		ID:              id,
-		IsSuccesor:      succesor,
+		IsSuccessor:      successor,
 		Pending:         make(map[string]*Pending),
 		DoorTimer:       time.NewTimer(config.Open_duration),
 		ReconnectTimer:  time.NewTimer(config.Reconnect_delay),
@@ -86,8 +86,8 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 			e.SavePending()
 		}
 
-	case network.Succesor:
-		log.Print("Elevator is now successor \n")
-		e.IsSuccesor = true
+	case network.Successor:
+		log.Println("Elevator is now the successor")
+		e.IsSuccessor = true
 	}
 }

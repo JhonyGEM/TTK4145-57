@@ -13,7 +13,7 @@ func printSeparator() {
 }
 
 func (m *Master) printHallRequest() {
-	fmt.Print("Hall request \n")
+	fmt.Println("Hall request")
 	printSeparator()
 	for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 		for f := 0; f < config.N_floors; f++ {
@@ -35,7 +35,7 @@ func (m *Master) printHallRequest() {
 }
 
 func (m *Master) printCabRequest() {
-	fmt.Print("Cab request \n")
+	fmt.Println("Cab request")
 	printSeparator()
 	for _, client := range m.ClientList {
 		for f := 0; f < config.N_floors; f++ {
@@ -51,7 +51,7 @@ func (m *Master) printCabRequest() {
 }
 
 func (m *Master) printClientList() {
-	fmt.Print("Client list \n")
+	fmt.Println("Client list")
 	printSeparator()
 	fmt.Printf("| %-*s| %-*s| %-*s| %-*s|\n", config.Cell_width, "ID", config.Cell_width, "Floor", config.Cell_width, "Obst", config.Cell_width, "AR")
 	printSeparator()

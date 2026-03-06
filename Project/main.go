@@ -13,26 +13,26 @@ import (
 	"time"
 )
 
-type MainState int
+type Role int
 
 const (
-	StateElevator MainState = iota
-	StateMaster
+	RoleElevator Role = iota
+	RoleMaster
 )
 
 // TODO: Problems
-// System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
-// If master do not have successor, then it accepts orders but do not distribute them
-// (fixed) When pc 1 is master and pc 2 is succesor, if we turn off wifi on pc 1 then pc 2 disconnects and starts a new master, while pc 1 do not disconnects its elevator and the master is stil runing -> thus we have two masters
+// (not a problem) System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
+// (not a problem?) If master do not have successor, then it accepts orders but do not distribute them
+// Can we end up in situation where there is no successor?
 
 // TODO: Need to do
 // 1. Imporve code quality
 
 func main() {
-	state := StateElevator
+	role := RoleElevator
 
 	id := flag.String("id", "", "ID value")
-	succesor := flag.Bool("succesor", false, "Succesor enable")
+	successor := flag.Bool("successor", false, "Successor enable")
 	flag.Parse()
 	if *id == "" {
 		log.Fatal("Missing required -id flag")
@@ -41,11 +41,11 @@ func main() {
 	b := master.NewBackup()
 
 	for {
-		switch state {
-		case StateElevator:
-			log.Printf("Starting elevator \n")
+		switch role {
+		case RoleElevator:
+			log.Println("Starting elevator")
 
-			e := elevator.NewElevator(*id, *succesor)
+			e := elevator.NewElevator(*id, *successor)
 			elevio.Init("localhost:15657", config.N_floors)
 			prevBtn := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
@@ -68,7 +68,7 @@ func main() {
 			e.LoadPending()
 			e.StepFSM()
 
-			for state == StateElevator {
+			for role == RoleElevator {
 				select {
 				case floor := <-drv_floors:
 					if floor != -1 {
@@ -121,7 +121,7 @@ func main() {
 					e.StepFSM()
 
 				case <-lossChan:
-					log.Print("Disconnected from server \n")
+					log.Println("Disconnected from server")
 					e.IsConnected = false
 					e.Connection = &network.Client{}
 					e.ReconnectTimer.Reset(config.Reconnect_delay)
@@ -132,7 +132,7 @@ func main() {
 					e.HandleMessage(message, b)
 
 				case <-quitChan:
-					state = StateMaster
+					role = RoleMaster
 					utilities.StartNewInstance(e.ID)
 					continue
 
@@ -143,8 +143,8 @@ func main() {
 				}
 			}
 
-		case StateMaster:
-			log.Printf("Starting master \n")
+		case RoleMaster:
+			log.Println("Starting master")
 
 			m := master.NewMaster()
 			m.CabRequests = b.CabRequests
@@ -163,10 +163,10 @@ func main() {
 				case new := <-newChan:
 					m.AddClient(new)
 					// Ok for testing, change to  m.IP != new.GetIP() in lab
-					if !m.HasSuccessor && m.IP != new.GetIP() {
+					if !m.HasSuccessor && m.IP == new.GetIP() {
 						m.HasSuccessor = true
 						m.SuccessorAddr = new.Addr
-						m.ClientList[new.Addr].Send(network.Message{Header: network.Succesor})
+						m.ClientList[new.Addr].Send(network.Message{Header: network.Successor})
 					}
 					m.ResendCabRequest(new.Addr)
 					m.SendLightUpdate()

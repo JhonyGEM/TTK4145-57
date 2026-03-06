@@ -13,7 +13,7 @@ const (
     FloorUpdate
     ObstructionUpdate
     ClientInfo
-	Succesor
+	Successor
     Heartbeat
     LightUpdate
 	Backup
@@ -50,8 +50,8 @@ func (m MessageType) String() string {
 		return "ObstructionUpdate"
 	case ClientInfo:
 		return "ClientInfo"
-	case Succesor:
-		return "Succesor"
+	case Successor:
+		return "Successor"
 	case Heartbeat:
 		return "Heartbeat"
 	case LightUpdate:

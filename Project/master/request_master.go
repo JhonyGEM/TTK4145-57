@@ -8,31 +8,31 @@ import (
 )
 
 func (m *Master) selectOptimalElevator(floor int) string {
-	chosen_addr := ""
-	lowest_cost := 9999
+	addr := ""
+	lowestCost := 9999
 
 	for _, client := range m.ClientList {
-		curr_floor := client.CurrentFloor
-		cost := utilities.Abs(curr_floor - floor) + client.ActiveReq * config.Cost_penalty
+		currentFloor := client.CurrentFloor
+		cost := utilities.Abs(currentFloor - floor) + client.ActiveReq * config.Cost_penalty
 		
 		if client.ActiveReq > 0 {
 			for f := 0; f < config.N_floors; f++ {
 				for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 					if m.HallRequests[f][b] && m.HallAssignments[f][b] == client.ID {
-						cost += utilities.Abs(curr_floor - f)
-						curr_floor = f
+						cost += utilities.Abs(currentFloor - f)
+						currentFloor = f
 					}
 				}
 			}
 		}
 
-		if cost < lowest_cost {
-			chosen_addr = client.Connection.Addr
-			lowest_cost = cost
+		if cost < lowestCost {
+			addr = client.Connection.Addr
+			lowestCost = cost
 		}
 	}
 	//log.Printf("Cost: %d, chosen client: %s \n", lowest_cost, m.Client_list[chosen_addr].ID)
-	return chosen_addr
+	return addr
 }
 
 func (m *Master) IsRequestActive(floor int, button elevio.ButtonType, addr string) bool {
@@ -52,14 +52,14 @@ func (m *Master) DistributeRequest(floor int, button elevio.ButtonType, addr str
 			m.ClientList[addr].TaskTimer.Reset(config.Request_timeout)
 		}
 	} else {
-		client_addr := m.selectOptimalElevator(floor)
-		if client_addr != "" {
-			m.HallAssignments[floor][button] = m.ClientList[client_addr].ID
-			m.ClientList[client_addr].ActiveReq++
-			m.ClientList[client_addr].Send(network.Message{Header: network.OrderReceived, 
+		clientAddr := m.selectOptimalElevator(floor)
+		if clientAddr != "" {
+			m.HallAssignments[floor][button] = m.ClientList[clientAddr].ID
+			m.ClientList[clientAddr].ActiveReq++
+			m.ClientList[clientAddr].Send(network.Message{Header: network.OrderReceived, 
 															Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
-			if !m.ClientList[client_addr].Obstruction {
-				m.ClientList[client_addr].TaskTimer.Reset(config.Request_timeout)
+			if !m.ClientList[clientAddr].Obstruction {
+				m.ClientList[clientAddr].TaskTimer.Reset(config.Request_timeout)
 			}
 		}
 	}

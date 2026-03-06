@@ -45,11 +45,11 @@ type ElevatorClient struct {
 }
 
 func NewCabRequests(floor int) []map[string]bool {
-	cab_requests := make([]map[string]bool, floor)
+	cabRequests := make([]map[string]bool, floor)
 	for f := 0; f < floor; f++ {
-		cab_requests[f] = make(map[string]bool)
+		cabRequests[f] = make(map[string]bool)
 	}
-	return cab_requests
+	return cabRequests
 }
 
 func NewHallAssignments(floors, buttons int) [][]string {
@@ -76,11 +76,11 @@ func (m *Master) FindNewSuccessor() {
 		if m.IP != client.Connection.GetIP() {
 			m.HasSuccessor = true
 			m.SuccessorAddr = client.Connection.Addr
-			client.Send(network.Message{Header: network.Succesor})
+			client.Send(network.Message{Header: network.Successor})
 			break
 		}
 	}
-	log.Print("No suitable successor found \n")
+	log.Println("No suitable successor found")
 }
 
 func (m *Master) HandleMessage(message network.Message) {

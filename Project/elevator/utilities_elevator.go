@@ -34,8 +34,8 @@ func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- 
 				e.RetryCounter++
 				e.ReconnectTimer.Stop()
 
-				if e.RetryCounter > config.Max_retries && e.IsSuccesor {
-					log.Print("Max tries reached, elevator becomes master \n")
+				if e.RetryCounter > config.Max_retries && e.IsSuccessor {
+					log.Println("Max retries reached, elevator becomes master")
 					close(quitChan)
 					wg.Wait()
 					elevio.Stop()
@@ -61,17 +61,17 @@ func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- 
 					Payload: &network.MessagePayload{ID: e.ID, CurrentFloor: e.CurrentFloor, Obstruction: e.Obstruction}})
 				go e.Connection.Listen(msgChan, lossChan)
 				go e.Connection.Heartbeat()
-				log.Printf("Connected to server \n")
+				log.Println("Connected to server")
 			} else {
-				log.Print("No internet connection, retrying... \n")
+				log.Println("No internet connection, retrying...")
 				e.ReconnectTimer.Reset(config.Reconnect_delay)
 			}
 
 		case <-e.PendingTicker.C:
 			if e.IsConnected && len(e.Pending) > 0 {
-				for _, pend_msg := range e.Pending {
-					if time.Since(pend_msg.Timestamp) > config.Pending_timeout {
-						pendChan <- pend_msg.Message.UID
+				for _, pendingMsg := range e.Pending {
+					if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
+						pendChan <- pendingMsg.Message.UID
 					}
 				}
 			}
