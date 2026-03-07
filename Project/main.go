@@ -24,6 +24,7 @@ const (
 // (not a problem) System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
 // (not a problem?) If master do not have successor, then it accepts orders but do not distribute them
 // Can we end up in situation where there is no successor?
+// fixed fusion of offline and master cab lights, init with obstruction active, init with active orders, some init elev logic, added redundancy to successor mesgs, saving and loading of cab request durning elev promotion
 
 // TODO: Need to do
 // 1. Imporve code quality
@@ -65,7 +66,8 @@ func main() {
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan, &wg)
 			go e.TimerHandler(msgChan, lossChan, quitChan, pendChan, &wg)
 
-			e.LoadPending()
+			e.Pending = utilities.LoadFromFile(config.Pending_backup)
+			e.LoadCabRequests()
 			e.StepFSM()
 
 			for role == RoleElevator {
@@ -92,10 +94,10 @@ func main() {
 								Payload: &network.MessagePayload{
 									OrderFloor: btn.Floor, OrderButton: btn.Button},
 								UID: utilities.GenUID(e.ID, e.Sequence)}
+							e.Sequence++				
+							e.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
+							utilities.SaveToFile(config.Pending_backup, e.Pending)
 							e.Send(message)
-							e.Sequence++
-							e.Pending[message.UID] = &elevator.Pending{Message: message, Timestamp: time.Now()}
-							e.SavePending()
 						} else {
 							if btn.Button == elevio.BT_Cab {
 								e.Requests[btn.Floor][btn.Button] = true
@@ -126,12 +128,17 @@ func main() {
 					e.Connection = &network.Client{}
 					e.ReconnectTimer.Reset(config.Reconnect_delay)
 					e.RemoveHallRequests()
+					e.UpdateLights(e.Requests)
+					if elevio.GetFloor() == -1 && !e.RequestPending() {
+						e.UpdateState(elevator.Undefined)
+					}
 					e.StepFSM()
 
 				case message := <-msgChan:
 					e.HandleMessage(message, b)
 
 				case <-quitChan:
+					e.SaveCabRequests()
 					role = RoleMaster
 					utilities.StartNewInstance(e.ID)
 					continue
@@ -139,7 +146,7 @@ func main() {
 				case uid := <-pendChan:
 					e.Send(e.Pending[uid].Message)
 					e.Pending[uid].Timestamp = time.Now()
-					e.SavePending()
+					utilities.SaveToFile(config.Pending_backup, e.Pending)
 				}
 			}
 
@@ -156,17 +163,14 @@ func main() {
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 
 			go network.StartServer(lossChan, newChan, msgChan)
-			go m.ClientTimerHandler()
+			go m.MonitorTimeouts()
 
 			for {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
-					// Ok for testing, change to  m.IP != new.GetIP() in lab
-					if !m.HasSuccessor && m.IP == new.GetIP() {
-						m.HasSuccessor = true
-						m.SuccessorAddr = new.Addr
-						m.ClientList[new.Addr].Send(network.Message{Header: network.Successor})
+					if !m.HasSuccessor && !m.ProspectNotified {
+						m.FindNewSuccessor()
 					}
 					m.ResendCabRequest(new.Addr)
 					m.SendLightUpdate()

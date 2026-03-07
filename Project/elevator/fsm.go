@@ -9,17 +9,23 @@ func (e *Elevator) StepFSM() {
 	switch e.CurrentState {
 	case Undefined:
 		e.UpdateLights(e.Requests)
-		elevio.SetDoorOpenLamp(false)
+		e.Obstruction = elevio.GetObstruction()
+		elevio.SetDoorOpenLamp(e.Obstruction)
 
 		if elevio.GetFloor() == -1 {
 			e.updateDirection(elevio.MD_Down)
 		} else {
+			e.CurrentFloor = elevio.GetFloor()
 			e.updateDirection(elevio.MD_Stop)
-			e.UpdateState(Idle)
+			if e.Obstruction {
+				e.UpdateState(DoorOpen)
+			} else {
+				e.UpdateState(Idle)
+			}
 		}
 
 	case Idle:
-		if e.requestPending() {
+		if e.RequestPending() {
 			if e.requestHere() {
 				e.clearAtCurrentFloor()
 				if !e.IsConnected {
@@ -57,7 +63,7 @@ func (e *Elevator) StepFSM() {
 			if e.DoorTimerDone {
 				elevio.SetDoorOpenLamp(false)
 				e.DoorTimerDone = false
-				if e.requestPending() {
+				if e.RequestPending() {
 					e.UpdateState(Moving)
 				} else {
 					e.UpdateState(Idle)

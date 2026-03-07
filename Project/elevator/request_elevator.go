@@ -4,9 +4,10 @@ import (
 	"project/config"
 	"project/elevio"
 	"project/network"
+	"project/utilities"
 )
 
-func (e *Elevator) requestPending() bool {
+func (e *Elevator) RequestPending() bool {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
 			if e.Requests[f][b] {
@@ -100,4 +101,31 @@ func (e *Elevator) clearAtCurrentFloor() {
 		e.clearRequest(e.CurrentFloor, elevio.BT_HallUp)
 		e.clearRequest(e.CurrentFloor, elevio.BT_HallDown)
 	}
+}
+
+func (e *Elevator) SaveCabRequests() {
+	cabRequest := make(map[string]*network.Pending)
+	for f := 0; f < config.N_floors; f++ {
+		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
+			if b == elevio.BT_Cab && e.Requests[f][b] {
+				uid := utilities.GenUID(e.ID, e.Sequence)
+				e.Sequence++
+				cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: f, OrderButton: b}}}
+			}
+		}
+	}
+	utilities.SaveToFile(config.Elev_backup, cabRequest)
+}
+
+func (e *Elevator) LoadCabRequests() {
+	cabRequest := utilities.LoadFromFile(config.Elev_backup)
+
+	for uid, request := range cabRequest {
+		if request.Message.Header == network.OrderReceived {
+			e.Requests[request.Message.Payload.OrderFloor][request.Message.Payload.OrderButton] = true
+			e.UpdateLights(e.Requests)
+			delete(cabRequest, uid)
+		}
+	}
+	utilities.SaveToFile(config.Elev_backup, cabRequest)
 }

@@ -3,6 +3,7 @@ package network
 import (
 	"project/elevio"
 	"fmt"
+	"time"
 )
 
 type MessageType int
@@ -36,6 +37,11 @@ type Message struct {
 	Payload *MessagePayload			`json:"payload,omitempty"`
 	Address string					`json:"address,omitempty"`
 	UID     string                  `json:"uid,omitempty"`
+}
+
+type Pending struct {
+	Timestamp time.Time				`json:"timestamp,omitempty"`
+	Message   Message				`json:"message"`
 }
 
 func (m MessageType) String() string {

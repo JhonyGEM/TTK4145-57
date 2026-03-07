@@ -8,6 +8,7 @@ import (
 const N_floors =		4
 const N_buttons =		3
 const Open_duration =	3 * time.Second
+const Elev_backup =     "elevator_backup.json"
 
 // Network
 const UDP_port =			":60000"
@@ -28,6 +29,8 @@ const Cost_penalty =        2
 const Max_retries = 		1
 const Request_timeout = 	N_floors * 4 * time.Second
 const Resend_rate =         30 * time.Second
+const MonitorInterval =     500 * time.Millisecond
+const Pending_backup =      "pending_backup.json"
 
 // Debugging
 const Cell_width =          8

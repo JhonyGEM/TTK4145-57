@@ -31,21 +31,29 @@ func (m *Master) RemoveClient(addr string) {
 	}
 }
 
-// Handles task timer for each client
-func (m *Master) ClientTimerHandler() {
+func (m *Master) MonitorTimeouts() {
+	ticker := time.NewTicker(config.MonitorInterval)
 	for {
-		for _, client := range m.ClientList {
-			if client.TaskTimer != nil {
+		select {
+		case <-ticker.C:
+			for _, client := range m.ClientList {
+				if client.TaskTimer == nil {
+					continue
+				}
 				select {
 				case <-client.TaskTimer.C:
 					client.TaskTimer.Stop()
 					client.Connection.Conn.Close()
-
 				default:
-				
 				}
 			}
-			time.Sleep(500 * time.Millisecond)
+			for uid, pend := range m.Pending {
+				if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
+					m.ProspectNotified = false
+					delete(m.Pending, uid)
+					m.FindNewSuccessor()
+				}
+			}
 		}
 	}
 }

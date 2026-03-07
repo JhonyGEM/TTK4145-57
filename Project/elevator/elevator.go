@@ -19,11 +19,6 @@ const (
 	DoorOpen
 )
 
-type Pending struct {
-	Timestamp time.Time
-	Message   network.Message
-}
-
 type Elevator struct {
 	CurrentState    ElevatorState
 	CurrentFloor    int
@@ -37,7 +32,7 @@ type Elevator struct {
 	IsConnected     bool
 	RetryCounter    int
 	Sequence        int
-	Pending         map[string]*Pending    // key = uid
+	Pending         map[string]*network.Pending    // key = uid
 	//Timers
 	DoorTimer       *time.Timer
 	DoorTimerDone   bool
@@ -52,7 +47,7 @@ func NewElevator(id string, successor bool) *Elevator {
 		Requests:        utilities.NewRequests(config.N_floors, config.N_buttons),
 		ID:              id,
 		IsSuccessor:      successor,
-		Pending:         make(map[string]*Pending),
+		Pending:         make(map[string]*network.Pending),
 		DoorTimer:       time.NewTimer(config.Open_duration),
 		ReconnectTimer:  time.NewTimer(config.Reconnect_delay),
 		PendingTicker:   time.NewTicker(config.Pending_check_rate),
@@ -83,11 +78,12 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 		_, ok := e.Pending[message.UID]
 		if ok {
 			delete(e.Pending, message.UID)
-			e.SavePending()
+			utilities.SaveToFile(config.Pending_backup, e.Pending)
 		}
 
 	case network.Successor:
 		log.Println("Elevator is now the successor")
 		e.IsSuccessor = true
+		e.Send(network.Message{Header: network.Ack, UID: message.UID})
 	}
 }

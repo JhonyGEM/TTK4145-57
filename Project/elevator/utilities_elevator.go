@@ -1,9 +1,7 @@
 package elevator
 
 import (
-	"encoding/json"
 	"log"
-	"os"
 	"project/config"
 	"project/elevio"
 	"project/network"
@@ -14,7 +12,11 @@ import (
 func (e *Elevator) UpdateLights(request [][]bool) {
 	for floor := 0; floor < config.N_floors; floor++ {
 		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
-			elevio.SetButtonLamp(btn, floor, request[floor][btn])
+			if btn == elevio.BT_Cab {
+				elevio.SetButtonLamp(btn, floor, request[floor][btn] || e.Requests[floor][btn])
+			} else {
+				elevio.SetButtonLamp(btn, floor, request[floor][btn])
+			}
 		}
 	}
 }
@@ -68,32 +70,13 @@ func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- 
 			}
 
 		case <-e.PendingTicker.C:
-			if e.IsConnected && len(e.Pending) > 0 {
-				for _, pendingMsg := range e.Pending {
+			if e.IsConnected {
+				for uid, pendingMsg := range e.Pending {
 					if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
-						pendChan <- pendingMsg.Message.UID
+						pendChan <- uid
 					}
 				}
 			}
 		}
 	}
-}
-
-func (e *Elevator) SavePending() {
-	data, _ := json.Marshal(e.Pending)
-	os.WriteFile("pending_backup.json", data, 0644)
-}
-
-func (e *Elevator) LoadPending() {
-	data, err := os.ReadFile("pending_backup.json")
-	if err != nil {
-		return
-	}
-
-	var pending map[string]*Pending
-	if err := json.Unmarshal(data, &pending); err != nil {
-		return
-	}
-
-	e.Pending = pending
 }
