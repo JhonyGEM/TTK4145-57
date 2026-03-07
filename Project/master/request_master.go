@@ -15,6 +15,9 @@ func (m *Master) selectOptimalElevator(floor int) string {
 		currentFloor := client.CurrentFloor
 		cost := utilities.Abs(currentFloor - floor) + client.ActiveReq * config.Cost_penalty
 		
+		if client.Obstruction {
+			cost += config.Cost_penalty
+		}
 		if client.ActiveReq > 0 {
 			for f := 0; f < config.N_floors; f++ {
 				for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {

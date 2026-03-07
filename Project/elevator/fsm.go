@@ -10,12 +10,11 @@ func (e *Elevator) StepFSM() {
 	case Undefined:
 		e.UpdateLights(e.Requests)
 		e.Obstruction = elevio.GetObstruction()
-		elevio.SetDoorOpenLamp(e.Obstruction)
+		elevio.SetDoorOpenLamp(false)
 
 		if elevio.GetFloor() == -1 {
 			e.updateDirection(elevio.MD_Down)
 		} else {
-			e.CurrentFloor = elevio.GetFloor()
 			e.updateDirection(elevio.MD_Stop)
 			if e.Obstruction {
 				e.UpdateState(DoorOpen)
