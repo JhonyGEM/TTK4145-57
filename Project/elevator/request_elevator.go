@@ -106,12 +106,10 @@ func (e *Elevator) clearAtCurrentFloor() {
 func (e *Elevator) SaveCabRequests() {
 	cabRequest := make(map[string]*network.Pending)
 	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if b == elevio.BT_Cab && e.Requests[f][b] {
-				uid := utilities.GenUID(e.ID, e.Sequence)
-				e.Sequence++
-				cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: f, OrderButton: b}}}
-			}
+		if e.Requests[f][elevio.BT_Cab] {
+			uid := utilities.GenUID(e.ID, e.Sequence)
+			e.Sequence++
+			cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: f, OrderButton: elevio.BT_Cab}}}
 		}
 	}
 	utilities.SaveToFile(config.Elev_backup, cabRequest)

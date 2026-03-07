@@ -184,3 +184,25 @@ func (m *Master) HandleMessage(message network.Message) {
 	}
 	//m.Print()
 }
+
+func (m *Master) HandleClientLoss(client *network.Client) {
+	id := m.ClientList[client.Addr].ID
+	m.RemoveClient(client.Addr)
+	if len(m.ClientList) == 0 {
+		log.Fatal("Loss of internet")
+	} 
+	if len(m.ClientList) == 1 && !network.HasInternetConnection() {
+		for _, client := range m.ClientList {
+			client.Connection.Conn.Close()
+			break
+		}
+	}
+	if len(m.ClientList) > 0 {
+		if client.Addr == m.SuccessorAddr {
+			m.HasSuccessor = false
+			m.SuccessorAddr = ""
+			m.FindNewSuccessor()
+		}
+		m.RedistributeHallRequest(id)
+	}
+}

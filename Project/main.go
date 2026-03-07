@@ -73,38 +73,12 @@ func main() {
 			for role == RoleElevator {
 				select {
 				case floor := <-drv_floors:
-					if floor != -1 {
-						e.CurrentFloor = floor
-						elevio.SetFloorIndicator(floor)
-						e.StepFSM()
-						if e.IsConnected {
-							e.Send(network.Message{
-								Header: network.FloorUpdate,
-								Payload: &network.MessagePayload{
-									CurrentFloor: e.CurrentFloor}})
-						}
-					}
+					e.HandleFloorUpdate(floor)
 
 				case btn := <-drv_buttons:
 					if prevBtn != btn {
 						prevBtn = btn
-						if e.IsConnected {
-							message := network.Message{
-								Header: network.OrderReceived,
-								Payload: &network.MessagePayload{
-									OrderFloor: btn.Floor, OrderButton: btn.Button},
-								UID: utilities.GenUID(e.ID, e.Sequence)}
-							e.Sequence++				
-							e.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
-							utilities.SaveToFile(config.Pending_backup, e.Pending)
-							e.Send(message)
-						} else {
-							if btn.Button == elevio.BT_Cab {
-								e.Requests[btn.Floor][btn.Button] = true
-								e.UpdateLights(e.Requests)
-								e.StepFSM()
-							}
-						}
+						e.HanldleButtonPress(btn)
 					}
 
 				case obs := <-drv_obstruction:
@@ -123,16 +97,7 @@ func main() {
 					e.StepFSM()
 
 				case <-lossChan:
-					log.Println("Disconnected from server")
-					e.IsConnected = false
-					e.Connection = &network.Client{}
-					e.ReconnectTimer.Reset(config.Reconnect_delay)
-					e.RemoveHallRequests()
-					e.UpdateLights(e.Requests)
-					if elevio.GetFloor() == -1 && !e.RequestPending() {
-						e.UpdateState(elevator.Undefined)
-					}
-					e.StepFSM()
+					e.HandleDisconnect()
 
 				case message := <-msgChan:
 					e.HandleMessage(message, b)
@@ -176,25 +141,7 @@ func main() {
 					m.SendLightUpdate()
 
 				case lost := <-lossChan:
-					id := m.ClientList[lost.Addr].ID
-					m.RemoveClient(lost.Addr)
-					if len(m.ClientList) == 0 {
-						log.Fatal("Loss of internet")
-					} 
-					if len(m.ClientList) == 1 && !network.HasInternetConnection() {
-						for _, client := range m.ClientList {
-							client.Connection.Conn.Close()
-							break
-						}
-					}
-					if len(m.ClientList) > 0 {
-						if lost.Addr == m.SuccessorAddr {
-							m.HasSuccessor = false
-							m.SuccessorAddr = ""
-							m.FindNewSuccessor()
-						}
-						m.RedistributeHallRequest(id)
-					}
+					m.HandleClientLoss(lost)
 
 				case message := <-msgChan:
 					m.HandleMessage(message)

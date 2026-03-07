@@ -21,12 +21,12 @@ const UDP_broadcast_rate =  1 * time.Second
 const Pending_timeout =     60 * time.Second
 const Pending_check_rate =  2 * time.Second
 const Reconnect_delay = 	5 * time.Second
-const Msg_buf_size =        (N_floors * N_buttons) * 2
 
 // Master
 const N_elevators = 		3
 const Cost_penalty =        2
 const Max_retries = 		1
+const Msg_buf_size =        (N_floors * N_buttons) * 2
 const Request_timeout = 	N_floors * 4 * time.Second
 const Resend_rate =         30 * time.Second
 const MonitorInterval =     500 * time.Millisecond

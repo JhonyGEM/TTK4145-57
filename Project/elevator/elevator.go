@@ -87,3 +87,50 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 		e.Send(network.Message{Header: network.Ack, UID: message.UID})
 	}
 }
+
+func (e *Elevator) HandleFloorUpdate(floor int) {
+	if floor != -1 {
+		e.CurrentFloor = floor
+		elevio.SetFloorIndicator(floor)
+		e.StepFSM()
+		if e.IsConnected {
+			e.Send(network.Message{
+				Header: network.FloorUpdate,
+				Payload: &network.MessagePayload{
+					CurrentFloor: e.CurrentFloor}})
+		}
+	}
+}
+
+func (e *Elevator) HanldleButtonPress(btn elevio.ButtonEvent) {
+	if e.IsConnected {
+		message := network.Message{
+			Header: network.OrderReceived,
+			Payload: &network.MessagePayload{
+				OrderFloor: btn.Floor, OrderButton: btn.Button},
+			UID: utilities.GenUID(e.ID, e.Sequence)}
+		e.Sequence++				
+		e.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
+		utilities.SaveToFile(config.Pending_backup, e.Pending)
+		e.Send(message)
+	} else {
+		if btn.Button == elevio.BT_Cab {
+			e.Requests[btn.Floor][btn.Button] = true
+			e.UpdateLights(e.Requests)
+			e.StepFSM()
+		}
+	}
+}
+
+func (e *Elevator) HandleDisconnect() {
+	log.Println("Disconnected from server")
+	e.IsConnected = false
+	e.Connection = &network.Client{}
+	e.ReconnectTimer.Reset(config.Reconnect_delay)
+	e.RemoveHallRequests()
+	e.UpdateLights(e.Requests)
+	if elevio.GetFloor() == -1 && !e.RequestPending() {
+		e.UpdateState(Undefined)
+	}
+	e.StepFSM()
+}
