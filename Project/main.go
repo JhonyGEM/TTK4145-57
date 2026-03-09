@@ -21,10 +21,11 @@ const (
 )
 
 // TODO: Problems
-// (not a problem) System can be slow to detect client crash (heartbeat 5s delay) -> the send wrapper funcion can crash master
-// (not a problem?) If master do not have successor, then it accepts orders but do not distribute them
+// If master do not have successor, then it accepts orders but does not distribute them or update the button lights
 // Can we end up in situation where there is no successor?
-// fixed fusion of offline and master cab lights, init with obstruction active, init with active orders, some init elev logic, added redundancy to successor mesgs, saving and loading of cab request durning elev promotion
+
+// TODO: Recent fixes
+// fusion of offline and master cab lights, init with obstruction active, init with active orders, some init elev logic, added redundancy to successor mesgs, saving and loading of cab request durning elev promotion
 
 // TODO: Need to do
 // 1. Imporve code quality
