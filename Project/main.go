@@ -135,8 +135,8 @@ func main() {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
-					if !m.HasSuccessor && !m.ProspectNotified {
-						m.FindNewSuccessor()
+					if !m.HasSuccessor && !m.SuccessorNotified {
+						m.NotifyNewSuccessor()
 					}
 					m.ResendCabRequest(new.Addr)
 					m.SendLightUpdate()

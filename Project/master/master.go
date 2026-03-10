@@ -29,7 +29,7 @@ type Master struct {
 	CabRequests         []map[string]bool
 	HasSuccessor        bool
 	SuccessorAddr       string
-	ProspectNotified    bool
+	SuccessorNotified   bool
 	Sequence            int
 	Pending             map[string]*network.Pending		// key = uid
 	ResendTicker        *time.Ticker
@@ -72,13 +72,13 @@ func NewMaster() *Master {
 	}
 }
 
-func (m *Master) FindNewSuccessor() {
+func (m *Master) NotifyNewSuccessor() {
 	for _, client := range m.ClientList {
 		// Ok for testing, change to  m.IP != new.GetIP() in lab
 		if m.IP == client.Connection.GetIP() {
 			uid := utilities.GenUID("master", m.Sequence)
 			message := network.Message{Header: network.Successor, UID: uid}
-			m.ProspectNotified = true
+			m.SuccessorNotified = true
 			m.Pending[uid] = &network.Pending{Message: message, Timestamp: time.Now()}
 			client.Send(message)
 			return
@@ -151,7 +151,7 @@ func (m *Master) HandleMessage(message network.Message) {
 			case network.Successor:
 				if !m.HasSuccessor {
 					m.HasSuccessor = true
-					m.ProspectNotified = false
+					m.SuccessorNotified = false
 					m.SuccessorAddr = message.Address
 					m.ClientList[m.SuccessorAddr].Send(network.Message{Header: network.Backup, 
 																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
@@ -201,7 +201,7 @@ func (m *Master) HandleClientLoss(client *network.Client) {
 		if client.Addr == m.SuccessorAddr {
 			m.HasSuccessor = false
 			m.SuccessorAddr = ""
-			m.FindNewSuccessor()
+			m.NotifyNewSuccessor()
 		}
 		m.RedistributeHallRequest(id)
 	}
