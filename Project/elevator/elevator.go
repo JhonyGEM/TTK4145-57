@@ -24,7 +24,7 @@ type Elevator struct {
 	CurrentFloor    int
 	Direction       elevio.MotorDirection
 	Obstruction     bool
-	Requests        [][]bool
+	Requests        [][]bool						// [floor][button]
 	ID              string
 	IsSuccessor      bool
 	//Network
@@ -32,7 +32,7 @@ type Elevator struct {
 	IsConnected     bool
 	RetryCounter    int
 	Sequence        int
-	Pending         map[string]*network.Pending    // key = uid
+	Pending         map[string]*network.Pending		// [uid]
 	//Timers
 	DoorTimer       *time.Timer
 	DoorTimerDone   bool

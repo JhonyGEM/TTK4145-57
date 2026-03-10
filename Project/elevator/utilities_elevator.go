@@ -27,7 +27,7 @@ func (e *Elevator) Send(message network.Message) {
 	}
 }
 
-// Handles the reconnecting routine and resending of the messages that have not been acknowledged within time limit
+// Handles reconnecting to the server when the connection is lost and handling pending messages that have not been acknowledged within the expected time
 func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, pendChan chan<- string, wg *sync.WaitGroup) {
 	for {
 		select {

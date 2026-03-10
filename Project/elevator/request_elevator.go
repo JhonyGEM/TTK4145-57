@@ -121,9 +121,9 @@ func (e *Elevator) LoadCabRequests() {
 	for uid, request := range cabRequest {
 		if request.Message.Header == network.OrderReceived {
 			e.Requests[request.Message.Payload.OrderFloor][request.Message.Payload.OrderButton] = true
-			e.UpdateLights(e.Requests)
 			delete(cabRequest, uid)
 		}
 	}
+	e.UpdateLights(e.Requests)
 	utilities.SaveToFile(config.Elev_backup, cabRequest)
 }

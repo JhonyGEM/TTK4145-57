@@ -15,6 +15,8 @@ func (e *Elevator) StepFSM() {
 		if elevio.GetFloor() == -1 {
 			e.updateDirection(elevio.MD_Down)
 		} else {
+			e.CurrentFloor = elevio.GetFloor()
+			elevio.SetFloorIndicator(e.CurrentFloor)
 			e.updateDirection(elevio.MD_Stop)
 			if e.Obstruction {
 				e.UpdateState(DoorOpen)

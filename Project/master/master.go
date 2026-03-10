@@ -23,15 +23,15 @@ func NewBackup() *Backup {
 
 type Master struct {
 	IP				    string
-	ClientList 	        map[string]*ElevatorClient		// key = address
-	HallRequests        [][]bool
-	HallAssignments     [][]string
-	CabRequests         []map[string]bool
+	ClientList 	        map[string]*ElevatorClient		// [address]
+	HallRequests        [][]bool						// [floor][button]
+	HallAssignments     [][]string						// [floor][button]
+	CabRequests         []map[string]bool				// [floor][client id]
 	HasSuccessor        bool
 	SuccessorAddr       string
 	SuccessorNotified   bool
 	Sequence            int
-	Pending             map[string]*network.Pending		// key = uid
+	Pending             map[string]*network.Pending		// [uid]
 	ResendTicker        *time.Ticker
 }
 
@@ -103,7 +103,7 @@ func (m *Master) HandleMessage(message network.Message) {
 																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
 																	 UID: message.UID})
 			} else {
-				// Repeated request -> send ack to elevator to remove from pending list
+				// Repeated request -> notify elevator
 				m.ClientList[message.Address].Send(network.Message{Header: network.Ack, 
 																	UID: message.UID})
 			}
