@@ -151,6 +151,13 @@ func main() {
 					if m.HasSuccessor && len(m.ClientList) > 0 {
 						m.ResendHallRequest()
 					}
+
+				case <-m.SuccessorTimeout.C:
+					m.SuccessorTimeout.Stop()
+					if !m.HasSuccessor {
+						m.IsSuccessorTimeout = true
+						m.NotifyNewSuccessor()
+					}
 				}
 			}
 		}

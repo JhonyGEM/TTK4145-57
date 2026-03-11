@@ -22,17 +22,19 @@ func NewBackup() *Backup {
 }
 
 type Master struct {
-	IP				    string
-	ClientList 	        map[string]*ElevatorClient		// [address]
-	HallRequests        [][]bool						// [floor][button]
-	HallAssignments     [][]string						// [floor][button]
-	CabRequests         []map[string]bool				// [floor][client id]
-	HasSuccessor        bool
-	SuccessorAddr       string
-	SuccessorNotified   bool
-	Sequence            int
-	Pending             map[string]*network.Pending		// [uid]
-	ResendTicker        *time.Ticker
+	IP				    	string
+	ClientList 	        	map[string]*ElevatorClient		// [address]
+	HallRequests        	[][]bool						// [floor][button]
+	HallAssignments     	[][]string						// [floor][button]
+	CabRequests         	[]map[string]bool				// [floor][client id]
+	HasSuccessor        	bool
+	SuccessorAddr       	string
+	SuccessorNotified   	bool
+	Sequence            	int
+	Pending             	map[string]*network.Pending		// [uid]
+	ResendTicker        	*time.Ticker
+	SuccessorTimeout		*time.Timer
+	IsSuccessorTimeout		bool
 }
 
 type ElevatorClient struct {
@@ -63,19 +65,20 @@ func NewHallAssignments(floors, buttons int) [][]string {
 
 func NewMaster() *Master {
 	return &Master{
-		ClientList :      make(map[string]*ElevatorClient),
-		HallRequests:     utilities.NewRequests(config.N_floors, config.N_buttons),
-		HallAssignments:  NewHallAssignments(config.N_floors, config.N_buttons),
-		CabRequests:      NewCabRequests(config.N_floors),
-		Pending:          make(map[string]*network.Pending),
-		ResendTicker:     time.NewTicker(config.Resend_rate),
+		ClientList :      	make(map[string]*ElevatorClient),
+		HallRequests:     	utilities.NewRequests(config.N_floors, config.N_buttons),
+		HallAssignments:  	NewHallAssignments(config.N_floors, config.N_buttons),
+		CabRequests:      	NewCabRequests(config.N_floors),
+		Pending:          	make(map[string]*network.Pending),
+		ResendTicker:     	time.NewTicker(config.Resend_rate),
+		SuccessorTimeout:	time.NewTimer(config.Successor_timeout),
 	}
 }
 
 func (m *Master) NotifyNewSuccessor() {
 	for _, client := range m.ClientList {
 		// Ok for testing, change to  m.IP != new.GetIP() in lab
-		if m.IP == client.Connection.GetIP() {
+		if m.IP != client.Connection.GetIP() || (m.IsSuccessorTimeout && m.IP == client.Connection.GetIP()) {
 			uid := utilities.GenUID("master", m.Sequence)
 			message := network.Message{Header: network.Successor, UID: uid}
 			m.SuccessorNotified = true
@@ -85,6 +88,7 @@ func (m *Master) NotifyNewSuccessor() {
 		}
 	}
 	log.Println("No suitable successor found")
+	m.SuccessorTimeout.Reset(config.Successor_timeout)
 }
 
 func (m *Master) HandleMessage(message network.Message) {
@@ -152,6 +156,8 @@ func (m *Master) HandleMessage(message network.Message) {
 				if !m.HasSuccessor {
 					m.HasSuccessor = true
 					m.SuccessorNotified = false
+					m.SuccessorTimeout.Stop()
+					m.IsSuccessorTimeout = false
 					m.SuccessorAddr = message.Address
 					m.ClientList[m.SuccessorAddr].Send(network.Message{Header: network.Backup, 
 																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
@@ -201,6 +207,7 @@ func (m *Master) HandleClientLoss(client *network.Client) {
 		if client.Addr == m.SuccessorAddr {
 			m.HasSuccessor = false
 			m.SuccessorAddr = ""
+			m.SuccessorTimeout.Reset(config.Successor_timeout)
 			m.NotifyNewSuccessor()
 		}
 		m.RedistributeHallRequest(id)
