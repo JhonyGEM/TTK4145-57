@@ -20,16 +20,6 @@ const (
 	RoleMaster
 )
 
-// TODO: Problems
-// If master do not have successor, then it accepts orders but does not distribute them or update the button lights
-// Can we end up in situation where there is no successor?
-
-// TODO: Recent fixes
-// fusion of offline and master cab lights, init with obstruction active, init with active orders, some init elev logic, added redundancy to successor mesgs, saving and loading of cab request durning elev promotion
-
-// TODO: Need to do
-// 1. Imporve code quality
-
 func main() {
 	role := RoleElevator
 
@@ -45,7 +35,7 @@ func main() {
 	for {
 		switch role {
 		case RoleElevator:
-			log.Println("Starting elevator")
+			log.Printf("Starting elevator with id: %s", *id)
 
 			e := elevator.NewElevator(*id, *successor)
 			elevio.Init("localhost:15657", config.N_floors)

@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+type ElevatorClient struct {
+	Connection 		*network.Client
+	ID 				string
+	CurrentFloor 	int
+	PreviousFloor   int
+	Obstruction 	bool
+	ActiveReq       int
+	TaskTimer 		*time.Timer
+}
+
 func (ec *ElevatorClient) Send(message network.Message) {
 	if ec.Connection.Conn != nil {
 		ec.Connection.Send(message)

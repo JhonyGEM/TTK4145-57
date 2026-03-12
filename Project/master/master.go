@@ -41,16 +41,6 @@ type Successor struct {
 	IsTimeout       bool	
 }
 
-type ElevatorClient struct {
-	Connection 		*network.Client
-	ID 				string
-	CurrentFloor 	int
-	PreviousFloor   int
-	Obstruction 	bool
-	ActiveReq       int
-	TaskTimer 		*time.Timer
-}
-
 func NewCabRequests(floor int) []map[string]bool {
 	cabRequests := make([]map[string]bool, floor)
 	for f := 0; f < floor; f++ {

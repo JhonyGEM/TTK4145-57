@@ -103,6 +103,7 @@ func (e *Elevator) clearAtCurrentFloor() {
 	}
 }
 
+// Used to save active cab requests when elevator is promoted to master and new instance of elevator is started
 func (e *Elevator) SaveCabRequests() {
 	cabRequest := make(map[string]*network.Pending)
 	for f := 0; f < config.N_floors; f++ {
