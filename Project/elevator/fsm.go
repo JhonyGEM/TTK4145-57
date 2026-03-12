@@ -8,7 +8,7 @@ import (
 func (e *Elevator) StepFSM() {
 	switch e.CurrentState {
 	case Undefined:
-		e.UpdateLights(e.Requests)
+		e.UpdateLights(e.Lights)
 		e.Obstruction = elevio.GetObstruction()
 		elevio.SetDoorOpenLamp(false)
 
@@ -29,7 +29,7 @@ func (e *Elevator) StepFSM() {
 		if e.RequestPending() {
 			if e.requestHere() {
 				e.clearAtCurrentFloor()
-				e.UpdateLights(e.Requests)
+				e.UpdateLights(e.Lights)
 				e.DoorTimer.Reset(config.Open_duration)
 				e.UpdateState(DoorOpen)
 			} else {
@@ -42,7 +42,7 @@ func (e *Elevator) StepFSM() {
 			e.updateDirection(elevio.MD_Stop)
 			if e.shouldClear() {
 				e.clearAtCurrentFloor()
-				e.UpdateLights(e.Requests)
+				e.UpdateLights(e.Lights)
 			}
 			e.DoorTimer.Reset(config.Open_duration)	
 			e.UpdateState(DoorOpen)

@@ -12,11 +12,7 @@ import (
 func (e *Elevator) UpdateLights(request [][]bool) {
 	for floor := 0; floor < config.N_floors; floor++ {
 		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
-			if btn == elevio.BT_Cab {
-				elevio.SetButtonLamp(btn, floor, request[floor][btn] || e.Requests[floor][btn])
-			} else {
-				elevio.SetButtonLamp(btn, floor, request[floor][btn])
-			}
+			elevio.SetButtonLamp(btn, floor, request[floor][btn] || e.Requests[floor][btn])
 		}
 	}
 }

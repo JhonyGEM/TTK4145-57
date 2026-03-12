@@ -33,6 +33,7 @@ type Elevator struct {
 	RetryCounter    int
 	Sequence        int
 	Pending         map[string]*network.Pending		// [uid]
+	Lights			[][]bool						// [floor][button]
 	//Timers
 	DoorTimer       *time.Timer
 	DoorTimerDone   bool
@@ -46,8 +47,9 @@ func NewElevator(id string, successor bool) *Elevator {
 		CurrentFloor:   -1,
 		Requests:        utilities.NewRequests(config.N_floors, config.N_buttons),
 		ID:              id,
-		IsSuccessor:      successor,
+		IsSuccessor:     successor,
 		Pending:         make(map[string]*network.Pending),
+		Lights:	 		 utilities.NewRequests(config.N_floors, config.N_buttons),
 		DoorTimer:       time.NewTimer(config.Open_duration),
 		ReconnectTimer:  time.NewTimer(config.Reconnect_delay),
 		PendingTicker:   time.NewTicker(config.Pending_check_rate),
@@ -66,6 +68,7 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 		e.StepFSM()
 
 	case network.LightUpdate:
+		e.Lights = message.Payload.Lights
 		e.UpdateLights(message.Payload.Lights)
 
 	case network.Backup:
