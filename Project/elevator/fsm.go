@@ -29,9 +29,7 @@ func (e *Elevator) StepFSM() {
 		if e.RequestPending() {
 			if e.requestHere() {
 				e.clearAtCurrentFloor()
-				if !e.IsConnected {
-					e.UpdateLights(e.Requests)
-				}
+				e.UpdateLights(e.Requests)
 				e.DoorTimer.Reset(config.Open_duration)
 				e.UpdateState(DoorOpen)
 			} else {
@@ -44,9 +42,7 @@ func (e *Elevator) StepFSM() {
 			e.updateDirection(elevio.MD_Stop)
 			if e.shouldClear() {
 				e.clearAtCurrentFloor()
-				if !e.IsConnected {
-					e.UpdateLights(e.Requests)
-				}
+				e.UpdateLights(e.Requests)
 			}
 			e.DoorTimer.Reset(config.Open_duration)	
 			e.UpdateState(DoorOpen)

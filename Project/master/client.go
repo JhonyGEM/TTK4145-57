@@ -49,7 +49,7 @@ func (m *Master) MonitorTimeouts() {
 			}
 			for uid, pend := range m.Pending {
 				if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
-					m.SuccessorNotified = false
+					m.Successor.Notified = false
 					delete(m.Pending, uid)
 					m.NotifyNewSuccessor()
 				}

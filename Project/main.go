@@ -135,7 +135,7 @@ func main() {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
-					if !m.HasSuccessor && !m.SuccessorNotified {
+					if !m.HasSuccessor && !m.Successor.Notified {
 						m.NotifyNewSuccessor()
 					}
 					m.ResendCabRequest(new.Addr)
@@ -152,10 +152,10 @@ func main() {
 						m.ResendHallRequest()
 					}
 
-				case <-m.SuccessorTimeout.C:
-					m.SuccessorTimeout.Stop()
+				case <-m.Successor.TimeoutTimer.C:
+					m.Successor.TimeoutTimer.Stop()
 					if !m.HasSuccessor {
-						m.IsSuccessorTimeout = true
+						m.Successor.IsTimeout = true
 						m.NotifyNewSuccessor()
 					}
 				}
