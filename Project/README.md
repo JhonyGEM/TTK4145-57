@@ -11,6 +11,7 @@ If the current successor disconnects, master will select a new successor among t
 
 # Running the Program
 go run main.go -id=<elevator_id> [-successor]
+Need to start one elevator with successor flag to start initial master.
 
 ## Flags
 - **-id** (required)
