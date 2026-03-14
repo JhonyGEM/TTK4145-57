@@ -202,9 +202,10 @@ func (m *Master) HandleNewClient(client *network.Client) {
 func (m *Master) HandleClientLoss(client *network.Client) {
 	id := m.ClientList[client.Addr].ID
 	m.RemoveClient(client.Addr)
-	if len(m.ClientList) == 0 {
+	if len(m.ClientList) == 0 && !network.HasInternetConnection() {
 		log.Fatal("Loss of internet")
 	} 
+	// Case when elevator client running on the same machine as master
 	if len(m.ClientList) == 1 && !network.HasInternetConnection() {
 		for _, client := range m.ClientList {
 			client.Connection.Conn.Close()
