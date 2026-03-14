@@ -6,7 +6,6 @@ import (
 	"project/elevio"
 	"project/network"
 	"sync"
-	"time"
 )
 
 func (e *Elevator) UpdateLights(request [][]bool) {
@@ -23,8 +22,7 @@ func (e *Elevator) Send(message network.Message) {
 	}
 }
 
-// Handles reconnecting to the server when the connection is lost and handling pending messages that have not been acknowledged within the expected time
-func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, pendChan chan<- string, wg *sync.WaitGroup) {
+func (e *Elevator) ReconnectLoop(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-e.ReconnectTimer.C:
@@ -63,15 +61,6 @@ func (e *Elevator) TimerHandler(msgChan chan<- network.Message, lossChan chan<- 
 			} else {
 				log.Println("No internet connection, retrying...")
 				e.ReconnectTimer.Reset(config.Reconnect_delay)
-			}
-
-		case <-e.PendingTicker.C:
-			if e.IsConnected {
-				for uid, pendingMsg := range e.Pending {
-					if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
-						pendChan <- uid
-					}
-				}
 			}
 		}
 	}

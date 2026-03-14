@@ -5,6 +5,7 @@ import (
 	"project/elevio"
 	"project/network"
 	"project/utilities"
+	"time"
 )
 
 func (e *Elevator) RequestPending() bool {
@@ -103,7 +104,19 @@ func (e *Elevator) clearAtCurrentFloor() {
 	}
 }
 
-// Used to save active cab requests when elevator is promoted to master and new instance of elevator is started
+func (e *Elevator) ResendPendingRequest() {
+	if e.IsConnected {
+		for uid, pendingMsg := range e.Pending {
+			if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
+				e.Send(pendingMsg.Message)
+				e.Pending[uid].Timestamp = time.Now()
+				utilities.SaveToFile(config.Pending_backup, e.Pending)
+			}
+		}
+	}
+}
+
+// Saves active cab requests on master promotion
 func (e *Elevator) SaveCabRequests() {
 	cabRequest := make(map[string]*network.Pending)
 	for f := 0; f < config.N_floors; f++ {

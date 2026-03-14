@@ -41,32 +41,32 @@ func (m *Master) RemoveClient(addr string) {
 	}
 }
 
-func (m *Master) MonitorTimeouts() {
-	ticker := time.NewTicker(config.MonitorInterval)
-	for {
+func (m *Master) HandleClientTimeout() {
+	for _, client := range m.ClientList {
+		if client.TaskTimer == nil {
+			continue
+		}
 		select {
-		case <-ticker.C:
-			for _, client := range m.ClientList {
-				if client.TaskTimer == nil {
-					continue
-				}
-				select {
-				case <-client.TaskTimer.C:
-					client.TaskTimer.Stop()
-					if m.Successor.Address == client.Connection.Addr {
-						client.Send(network.Message{Header: network.NotSuccessor})
-					}
-					client.Connection.Conn.Close()
-				default:
-				}
+		case <-client.TaskTimer.C:
+			client.TaskTimer.Stop()
+			log.Printf("Client timeout: %s, Task timer expired", client.ID)
+			if m.Successor.Address == client.Connection.Addr {
+				client.Send(network.Message{Header: network.NotSuccessor})
 			}
-			for uid, pend := range m.Pending {
-				if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
-					m.Successor.Notified = false
-					delete(m.Pending, uid)
-					m.NotifyNewSuccessor()
-				}
+			client.Connection.Conn.Close()
+		default:
+		}
+	}
+}
+
+func (m *Master) HandleSuccessorTimeout() {
+	for uid, pend := range m.Pending {
+		if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
+			if !m.HasSuccessor {
+				m.Successor.Notified = false
+				m.NotifyNewSuccessor()
 			}
+			delete(m.Pending, uid)
 		}
 	}
 }

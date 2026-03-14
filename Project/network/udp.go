@@ -47,7 +47,6 @@ func DiscoverServer() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	//log.Printf("Received broadcast from %s: %s\n", addr.IP, string(buffer[:n]))
 
 	return fmt.Sprintf("%s" + config.TCP_port, addr.IP), nil
 }

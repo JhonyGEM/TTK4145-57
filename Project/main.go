@@ -10,7 +10,6 @@ import (
 	"project/network"
 	"project/utilities"
 	"sync"
-	"time"
 )
 
 type Role int
@@ -46,16 +45,15 @@ func main() {
 			drv_floors := make(chan int)
 			drv_obstruction := make(chan bool)
 
-			lossChan := make(chan *network.Client)
+			lostChan := make(chan *network.Client)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 			quitChan := make(chan struct{})
-			pendChan := make(chan string)
 
 			wg.Add(3)
 			go elevio.PollButtons(drv_buttons, quitChan, &wg)
 			go elevio.PollFloorSensor(drv_floors, quitChan, &wg)
 			go elevio.PollObstructionSwitch(drv_obstruction, quitChan, &wg)
-			go e.TimerHandler(msgChan, lossChan, quitChan, pendChan, &wg)
+			go e.ReconnectLoop(msgChan, lostChan, quitChan, &wg)
 
 			e.Pending = utilities.LoadFromFile(config.Pending_backup)
 			e.LoadCabRequests()
@@ -87,7 +85,7 @@ func main() {
 					e.DoorTimerDone = true
 					e.StepFSM()
 
-				case <-lossChan:
+				case <-lostChan:
 					e.HandleDisconnect()
 
 				case message := <-msgChan:
@@ -99,10 +97,8 @@ func main() {
 					utilities.StartNewInstance(e.ID)
 					continue
 
-				case uid := <-pendChan:
-					e.Send(e.Pending[uid].Message)
-					e.Pending[uid].Timestamp = time.Now()
-					utilities.SaveToFile(config.Pending_backup, e.Pending)
+				case <-e.PendingTicker.C:
+					e.ResendPendingRequest()
 				}
 			}
 
@@ -115,24 +111,17 @@ func main() {
 			m.IP = network.GetLocalIP()
 
 			newChan := make(chan *network.Client, config.N_elevators)
-			lossChan := make(chan *network.Client, config.N_elevators)
+			lostChan := make(chan *network.Client, config.N_elevators)
 			msgChan := make(chan network.Message, config.Msg_buf_size)
 
-			go network.StartServer(lossChan, newChan, msgChan)
-			go m.MonitorTimeouts()
+			go network.StartServer(lostChan, newChan, msgChan)
 
 			for {
 				select {
 				case new := <-newChan:
-					m.AddClient(new)
-					m.ClientList[new.Addr].Send(network.Message{Header: network.NotSuccessor})
-					if !m.HasSuccessor && !m.Successor.Notified {
-						m.NotifyNewSuccessor()
-					}
-					m.ResendCabRequest(new.Addr)
-					m.SendLightUpdate()
+					m.HandleNewClient(new)
 
-				case lost := <-lossChan:
+				case lost := <-lostChan:
 					m.HandleClientLoss(lost)
 
 				case message := <-msgChan:
@@ -142,6 +131,10 @@ func main() {
 					if m.HasSuccessor && len(m.ClientList) > 0 {
 						m.ResendHallRequest()
 					}
+
+				case <-m.TimeoutTicker.C:
+					m.HandleClientTimeout()
+					m.HandleSuccessorTimeout()
 
 				case <-m.Successor.TimeoutTimer.C:
 					m.Successor.TimeoutTimer.Stop()

@@ -34,7 +34,6 @@ func (m *Master) selectOptimalElevator(floor int) string {
 			lowestCost = cost
 		}
 	}
-	//log.Printf("Cost: %d, chosen client: %s \n", lowest_cost, m.Client_list[chosen_addr].ID)
 	return addr
 }
 

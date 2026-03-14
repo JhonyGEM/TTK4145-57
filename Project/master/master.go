@@ -32,6 +32,7 @@ type Master struct {
 	Sequence            	int
 	Pending             	map[string]*network.Pending		// [uid]
 	ResendTicker        	*time.Ticker
+	TimeoutTicker			*time.Ticker
 }
 
 type Successor struct {
@@ -63,9 +64,10 @@ func NewMaster() *Master {
 		HallRequests:     	utilities.NewRequests(config.N_floors, config.N_buttons),
 		HallAssignments:  	NewHallAssignments(config.N_floors, config.N_buttons),
 		CabRequests:      	NewCabRequests(config.N_floors),
+		Successor:          Successor{},
 		Pending:          	make(map[string]*network.Pending),
 		ResendTicker:     	time.NewTicker(config.Resend_rate),
-		Successor:          Successor{},
+		TimeoutTicker:		time.NewTicker(config.Timeout_check_rate),
 	}
 	master.Successor.TimeoutTimer = time.NewTimer(config.Successor_timeout)
 	return master
@@ -73,7 +75,6 @@ func NewMaster() *Master {
 
 func (m *Master) NotifyNewSuccessor() {
 	for _, client := range m.ClientList {
-		// Ok for testing, change to  m.IP != new.GetIP() in lab
 		if m.IP != client.Connection.GetIP() || (m.Successor.IsTimeout && m.IP == client.Connection.GetIP()) {
 			uid := utilities.GenUID("master", m.Sequence)
 			message := network.Message{Header: network.Successor, UID: uid}
@@ -88,7 +89,6 @@ func (m *Master) NotifyNewSuccessor() {
 }
 
 func (m *Master) HandleMessage(message network.Message) {
-	//log.Printf("Recived from %s: %v", m.Client_list[message.Address].ID, message.Header)
 	switch message.Header {
 	case network.OrderReceived:
 		if m.HasSuccessor {
@@ -187,7 +187,16 @@ func (m *Master) HandleMessage(message network.Message) {
 		m.ClientList[message.Address].Obstruction = message.Payload.Obstruction
 		m.ResendCabRequest(message.Address)
 	}
-	//m.Print()
+}
+
+func (m *Master) HandleNewClient(client *network.Client) {
+	m.AddClient(client)
+	m.ClientList[client.Addr].Send(network.Message{Header: network.NotSuccessor})
+	if !m.HasSuccessor && !m.Successor.Notified {
+		m.NotifyNewSuccessor()
+	}
+	m.ResendCabRequest(client.Addr)
+	m.SendLightUpdate()
 }
 
 func (m *Master) HandleClientLoss(client *network.Client) {
