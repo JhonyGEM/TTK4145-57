@@ -88,6 +88,9 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 		log.Println("Elevator is now the successor")
 		e.IsSuccessor = true
 		e.Send(network.Message{Header: network.Ack, UID: message.UID})
+
+	case network.NotSuccessor:
+		e.IsSuccessor = false
 	}
 }
 

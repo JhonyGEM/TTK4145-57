@@ -15,6 +15,7 @@ const (
     ObstructionUpdate
     ClientInfo
 	Successor
+	NotSuccessor
     Heartbeat
     LightUpdate
 	Backup
@@ -47,21 +48,23 @@ type Pending struct {
 func (m MessageType) String() string {
 	switch m {
 	case OrderReceived:
-		return "OrderReceived"
+		return "Order received"
 	case OrderFulfilled:
-		return "OrderFulfilled"
+		return "Order fulfilled"
 	case FloorUpdate:
-		return "FloorUpdate"
+		return "Floor update"
 	case ObstructionUpdate:
-		return "ObstructionUpdate"
+		return "Obstruction update"
 	case ClientInfo:
-		return "ClientInfo"
+		return "Client info"
 	case Successor:
 		return "Successor"
+	case NotSuccessor:
+		return "Not successor"
 	case Heartbeat:
 		return "Heartbeat"
 	case LightUpdate:
-		return "LightUpdate"
+		return "Light update"
 	case Backup:
 		return "Backup"
 	case Ack:

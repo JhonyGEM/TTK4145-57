@@ -53,6 +53,9 @@ func (m *Master) MonitorTimeouts() {
 				select {
 				case <-client.TaskTimer.C:
 					client.TaskTimer.Stop()
+					if m.Successor.Address == client.Connection.Addr {
+						client.Send(network.Message{Header: network.NotSuccessor})
+					}
 					client.Connection.Conn.Close()
 				default:
 				}

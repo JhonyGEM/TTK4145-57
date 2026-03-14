@@ -125,6 +125,7 @@ func main() {
 				select {
 				case new := <-newChan:
 					m.AddClient(new)
+					m.ClientList[new.Addr].Send(network.Message{Header: network.NotSuccessor})
 					if !m.HasSuccessor && !m.Successor.Notified {
 						m.NotifyNewSuccessor()
 					}
