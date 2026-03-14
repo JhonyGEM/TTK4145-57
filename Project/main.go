@@ -128,7 +128,7 @@ func main() {
 					m.HandleMessage(message)
 
 				case <-m.ResendTicker.C:
-					if m.HasSuccessor && len(m.ClientList) > 0 {
+					if m.HasSuccessor {
 						m.ResendHallRequest()
 					}
 

@@ -202,6 +202,7 @@ func (m *Master) HandleNewClient(client *network.Client) {
 func (m *Master) HandleClientLoss(client *network.Client) {
 	id := m.ClientList[client.Addr].ID
 	m.RemoveClient(client.Addr)
+	m.ResetHallAssignments(id)
 	if len(m.ClientList) == 0 && !network.HasInternetConnection() {
 		log.Fatal("Loss of internet")
 	} 
@@ -212,13 +213,15 @@ func (m *Master) HandleClientLoss(client *network.Client) {
 			break
 		}
 	}
-	if len(m.ClientList) > 0 {
-		if client.Addr == m.Successor.Address {
-			m.HasSuccessor = false
-			m.Successor.Address = ""
+	if client.Addr == m.Successor.Address {
+		m.HasSuccessor = false
+		m.Successor.Address = ""
+		if len(m.ClientList) > 0 {
 			m.Successor.TimeoutTimer.Reset(config.Successor_timeout)
 			m.NotifyNewSuccessor()
 		}
-		m.RedistributeHallRequest(id)
+	}
+	if len(m.ClientList) > 0 {
+		m.ResendHallRequest()
 	}
 }

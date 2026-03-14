@@ -68,11 +68,11 @@ func (m *Master) DistributeRequest(floor int, button elevio.ButtonType, addr str
 	m.SendLightUpdate()
 }
 
-func (m *Master) RedistributeHallRequest(id string) {
+func (m *Master) ResetHallAssignments(id string) {
 	for f := 0; f < config.N_floors; f++ {
 		for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
 			if m.HallAssignments[f][b] == id {
-				m.DistributeRequest(f, b, "")
+				m.HallAssignments[f][b] = ""
 			}
 		}
 	}
