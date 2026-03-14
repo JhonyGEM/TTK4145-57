@@ -13,7 +13,7 @@ const Pending_backup =      "pending_backup.json"
 const Pending_timeout =     15 * time.Second
 const Pending_check_rate =  1 * time.Second
 const Reconnect_delay = 	5 * time.Second
-const Max_retries = 		1
+const Max_retries = 		2
 
 // Network
 const UDP_port =			":60000"

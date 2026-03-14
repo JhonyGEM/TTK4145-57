@@ -131,6 +131,7 @@ func (e *Elevator) HandleDisconnect() {
 	e.Connection = &network.Client{}
 	e.ReconnectTimer.Reset(config.Reconnect_delay)
 	e.RemoveHallRequests()
+	e.Lights = e.Requests
 	e.UpdateLights(e.Requests)
 	if elevio.GetFloor() == -1 && !e.RequestPending() {
 		e.UpdateState(Undefined)

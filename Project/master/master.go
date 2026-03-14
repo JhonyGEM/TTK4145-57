@@ -133,6 +133,8 @@ func (m *Master) HandleMessage(message network.Message) {
 			m.ClientList[m.Successor.Address].Send(network.Message{Header: network.Backup, 
 																Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
 																UID: message.UID})
+		} else {
+			m.SendLightUpdate()
 		}
 
 	case network.Ack:
