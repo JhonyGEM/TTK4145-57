@@ -108,7 +108,7 @@ func (e *Elevator) HandleFloorUpdate(floor int) {
 	}
 }
 
-func (e *Elevator) HanldleButtonPress(btn elevio.ButtonEvent) {
+func (e *Elevator) HandleButtonPress(btn elevio.ButtonEvent) {
 	if e.IsConnected {
 		message := network.Message{
 			Header: network.OrderReceived,

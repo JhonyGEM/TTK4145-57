@@ -38,7 +38,7 @@ func main() {
 
 			e := elevator.NewElevator(*id, *successor)
 			elevio.Init("localhost:15657", config.N_floors)
-			prevBtn := elevio.ButtonEvent{Floor: -1, Button: -1}
+			previousButton := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
 			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
@@ -64,14 +64,14 @@ func main() {
 				case floor := <-drv_floors:
 					e.HandleFloorUpdate(floor)
 
-				case btn := <-drv_buttons:
-					if prevBtn != btn {
-						prevBtn = btn
-						e.HanldleButtonPress(btn)
+				case button := <-drv_buttons:
+					if previousButton != button {
+						previousButton = button
+						e.HandleButtonPress(button)
 					}
 
-				case obs := <-drv_obstruction:
-					e.Obstruction = obs
+				case obstruction := <-drv_obstruction:
+					e.Obstruction = obstruction
 					e.StepFSM()
 					if e.IsConnected {
 						e.Send(network.Message{
