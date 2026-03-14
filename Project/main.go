@@ -71,14 +71,7 @@ func main() {
 					}
 
 				case obstruction := <-drv_obstruction:
-					e.Obstruction = obstruction
-					e.StepFSM()
-					if e.IsConnected {
-						e.Send(network.Message{
-							Header: network.ObstructionUpdate,
-							Payload: &network.MessagePayload{
-								Obstruction: e.Obstruction}})
-					}
+					e.HandleObstructionUpdate(obstruction)
 
 				case <-e.DoorTimer.C:
 					e.DoorTimer.Stop()

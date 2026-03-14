@@ -128,6 +128,20 @@ func (e *Elevator) HandleButtonPress(btn elevio.ButtonEvent) {
 	}
 }
 
+func (e *Elevator) HandleObstructionUpdate(obstruction bool) {
+	e.Obstruction = obstruction
+	if !e.Obstruction {
+		e.DoorTimer.Reset(config.Open_duration)
+	}
+	e.StepFSM()
+	if e.IsConnected {
+		e.Send(network.Message{
+			Header: network.ObstructionUpdate,
+			Payload: &network.MessagePayload{
+				Obstruction: e.Obstruction}})
+	}
+}
+
 func (e *Elevator) HandleDisconnect() {
 	log.Println("Disconnected from server")
 	e.IsConnected = false
