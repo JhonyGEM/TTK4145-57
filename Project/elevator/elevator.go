@@ -130,7 +130,7 @@ func (e *Elevator) HandleButtonPress(btn elevio.ButtonEvent) {
 
 func (e *Elevator) HandleObstructionUpdate(obstruction bool) {
 	e.Obstruction = obstruction
-	if !e.Obstruction {
+	if !e.Obstruction && e.DoorTimer.Stop() {
 		e.DoorTimer.Reset(config.Open_duration)
 	}
 	e.StepFSM()

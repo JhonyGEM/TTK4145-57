@@ -127,7 +127,7 @@ func main() {
 
 				case <-m.TimeoutTicker.C:
 					m.HandleClientTimeout()
-					m.HandleSuccessorTimeout()
+					m.HandleSuccessorAckTimeout()
 
 				case <-m.Successor.TimeoutTimer.C:
 					m.Successor.TimeoutTimer.Stop()

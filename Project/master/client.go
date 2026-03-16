@@ -59,7 +59,7 @@ func (m *Master) HandleClientTimeout() {
 	}
 }
 
-func (m *Master) HandleSuccessorTimeout() {
+func (m *Master) HandleSuccessorAckTimeout() {
 	for uid, pend := range m.Pending {
 		if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
 			if !m.HasSuccessor {
