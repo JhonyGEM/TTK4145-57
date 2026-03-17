@@ -123,7 +123,8 @@ func (e *Elevator) SaveCabRequests() {
 		if e.Requests[f][elevio.BT_Cab] {
 			uid := utilities.GenUID(e.ID, e.Sequence)
 			e.Sequence++
-			cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, Payload: &network.MessagePayload{OrderFloor: f, OrderButton: elevio.BT_Cab}}}
+			cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, 
+																		Payload: &network.MessagePayload{OrderFloor: f, OrderButton: elevio.BT_Cab}}}
 		}
 	}
 	utilities.SaveToFile(config.Elev_backup, cabRequest)
