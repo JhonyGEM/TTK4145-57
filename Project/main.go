@@ -41,19 +41,19 @@ func main() {
 			previousButton := elevio.ButtonEvent{Floor: -1, Button: -1}
 			var wg sync.WaitGroup
 
-			drv_buttons := make(chan elevio.ButtonEvent, config.N_floors*config.N_buttons)
-			drv_floors := make(chan int)
-			drv_obstruction := make(chan bool)
+			buttonChan := make(chan elevio.ButtonEvent, config.Btn_buf_size)
+			floorChan := make(chan int)
+			obstructionChan := make(chan bool)
 
 			lostChan := make(chan *network.Client)
-			msgChan := make(chan network.Message, config.Msg_buf_size)
+			messageChan := make(chan network.Message, config.Msg_buf_size)
 			quitChan := make(chan struct{})
 
 			wg.Add(3)
-			go elevio.PollButtons(drv_buttons, quitChan, &wg)
-			go elevio.PollFloorSensor(drv_floors, quitChan, &wg)
-			go elevio.PollObstructionSwitch(drv_obstruction, quitChan, &wg)
-			go e.ReconnectLoop(msgChan, lostChan, quitChan, &wg)
+			go elevio.PollButtons(buttonChan, quitChan, &wg)
+			go elevio.PollFloorSensor(floorChan, quitChan, &wg)
+			go elevio.PollObstructionSwitch(obstructionChan, quitChan, &wg)
+			go e.ReconnectLoop(messageChan, lostChan, quitChan, &wg)
 
 			e.Pending = utilities.LoadFromFile(config.Pending_backup)
 			e.LoadCabRequests()
@@ -61,16 +61,16 @@ func main() {
 
 			for role == RoleElevator {
 				select {
-				case floor := <-drv_floors:
+				case floor := <-floorChan:
 					e.HandleFloorUpdate(floor)
 
-				case button := <-drv_buttons:
+				case button := <-buttonChan:
 					if previousButton != button {
 						previousButton = button
 						e.HandleButtonPress(button)
 					}
 
-				case obstruction := <-drv_obstruction:
+				case obstruction := <-obstructionChan:
 					e.HandleObstructionUpdate(obstruction)
 
 				case <-e.DoorTimer.C:
@@ -81,7 +81,7 @@ func main() {
 				case <-lostChan:
 					e.HandleDisconnect()
 
-				case message := <-msgChan:
+				case message := <-messageChan:
 					e.HandleMessage(message, b)
 
 				case <-quitChan:
@@ -105,9 +105,9 @@ func main() {
 
 			newChan := make(chan *network.Client, config.N_elevators)
 			lostChan := make(chan *network.Client, config.N_elevators)
-			msgChan := make(chan network.Message, config.Msg_buf_size)
+			messageChan := make(chan network.Message, config.Msg_buf_size)
 
-			go network.StartServer(lostChan, newChan, msgChan)
+			go network.StartServer(lostChan, newChan, messageChan)
 
 			for {
 				select {
@@ -117,7 +117,7 @@ func main() {
 				case lost := <-lostChan:
 					m.HandleClientLoss(lost)
 
-				case message := <-msgChan:
+				case message := <-messageChan:
 					m.HandleMessage(message)
 
 				case <-m.ResendTicker.C:

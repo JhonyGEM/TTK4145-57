@@ -12,7 +12,7 @@ func (m *Master) selectOptimalElevator(floor int) string {
 	lowestCost := 9999
 
 	for _, client := range m.ClientList {
-		cost := utilities.Abs(client.CurrentFloor- floor) + client.ActiveReq * config.Cost_penalty
+		cost := utilities.Abs(client.CurrentFloor - floor) + client.ActiveReq * config.Cost_penalty
 		
 		if client.Obstruction {
 			cost += config.Cost_penalty

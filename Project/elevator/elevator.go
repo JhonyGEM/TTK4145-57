@@ -63,7 +63,7 @@ func NewElevator(id string, successor bool) *Elevator {
 func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup) {
 	switch message.Header {
 	case network.OrderReceived:
-		log.Printf("Recieved order: Floor %d, %v", message.Payload.OrderFloor, message.Payload.OrderButton)
+		log.Printf("Received order: Floor %d, %v", message.Payload.OrderFloor, message.Payload.OrderButton)
 		e.Requests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 		e.StepFSM()
 
@@ -72,7 +72,7 @@ func (e *Elevator) HandleMessage(message network.Message, backup *master.Backup)
 		e.UpdateLights(message.Payload.Lights)
 
 	case network.Backup:
-		log.Printf("Recieved: %v", message.Header)
+		log.Printf("Received: %v", message.Header)
 		backup.CabRequests = message.Payload.BackupCab
 		backup.HallRequests = message.Payload.BackupHall
 		e.Send(network.Message{Header: network.Ack, UID: message.UID})
