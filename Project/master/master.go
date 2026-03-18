@@ -116,7 +116,9 @@ func (m *Master) HandleMessage(message network.Message) {
 			m.HallRequests[message.Payload.OrderFloor][message.Payload.OrderButton] = false
 			m.HallAssignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
 		}
-		m.ClientList[message.Address].ActiveReq--
+		if m.ClientList[message.Address].ActiveReq > 0 {
+			m.ClientList[message.Address].ActiveReq--
+		}
 		
 		if m.ClientList[message.Address].ActiveReq > 0 {
 			if !m.ClientList[message.Address].Obstruction {

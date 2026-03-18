@@ -12,21 +12,10 @@ func (m *Master) selectOptimalElevator(floor int) string {
 	lowestCost := 9999
 
 	for _, client := range m.ClientList {
-		currentFloor := client.CurrentFloor
-		cost := utilities.Abs(currentFloor - floor) + client.ActiveReq * config.Cost_penalty
+		cost := utilities.Abs(client.CurrentFloor- floor) + client.ActiveReq * config.Cost_penalty
 		
 		if client.Obstruction {
 			cost += config.Cost_penalty
-		}
-		if client.ActiveReq > 0 {
-			for f := 0; f < config.N_floors; f++ {
-				for b := elevio.ButtonType(0); b < elevio.ButtonType(2); b++ {
-					if (m.HallRequests[f][b] && m.HallAssignments[f][b] == client.ID) || m.CabRequests[f][client.ID] {
-						cost += utilities.Abs(currentFloor - f)
-						currentFloor = f
-					}
-				}
-			}
 		}
 
 		if cost < lowestCost {
