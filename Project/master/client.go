@@ -23,12 +23,12 @@ func (ec *ElevatorClient) Send(message network.Message) {
 }
 
 func (m *Master) AddClient(c *network.Client) {
-	elev := &ElevatorClient{
+	client := &ElevatorClient{
 		Connection:     c,
 		TaskTimer:      time.NewTimer(config.Request_timeout),
 	}
-	elev.TaskTimer.Stop()
-	m.ClientList[c.Addr] = elev
+	client.TaskTimer.Stop()
+	m.ClientList[c.Addr] = client
 	log.Printf("Client connected: %s", c.Addr)
 }
 
@@ -41,7 +41,7 @@ func (m *Master) RemoveClient(addr string) {
 }
 
 func (m *Master) HandleClientTimeout() {
-	for _, client := range m.ClientList {
+	for addr, client := range m.ClientList {
 		if client.TaskTimer == nil {
 			continue
 		}
@@ -49,7 +49,7 @@ func (m *Master) HandleClientTimeout() {
 		case <-client.TaskTimer.C:
 			client.TaskTimer.Stop()
 			log.Printf("Client timeout: %s, Task timer expired", client.ID)
-			if m.Successor.Address == client.Connection.Addr {
+			if m.Successor.Address == addr {
 				client.Send(network.Message{Header: network.NotSuccessor})
 			}
 			client.Connection.Conn.Close()
@@ -62,7 +62,12 @@ func (m *Master) HandleSuccessorAckTimeout() {
 	for uid, pend := range m.Pending {
 		if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
 			if !m.HasSuccessor {
+				client, ok := m.ClientList[pend.Message.Address]
+				if ok {
+					client.Send(network.Message{Header: network.NotSuccessor})
+				}
 				m.Successor.IsNotified = false
+				m.Successor.SearchTimer.Reset(config.Successor_timeout)
 				m.NotifyNewSuccessor()
 			}
 			delete(m.Pending, uid)

@@ -41,8 +41,8 @@ type MasterRequests struct {
 type Successor struct {
 	Address					string
 	IsNotified				bool
-	TimeoutTimer   			*time.Timer
-	IsTimeout     			bool	
+	SearchTimer   			*time.Timer
+	SearchTimedOut     		bool	
 }
 
 type MasterTickers struct {
@@ -70,36 +70,37 @@ func NewMaster() *Master {
 	master := &Master{
 		ClientList:	make(map[string]*ElevatorClient),
 		Requests: MasterRequests{
-			Hall: 				utilities.NewRequests(), 
-			HallAssignments: 	NewHallAssignments(), 
-			Cab: 				NewCabRequests()},
+			Hall: 					utilities.NewRequests(), 
+			HallAssignments: 		NewHallAssignments(), 
+			Cab: 					NewCabRequests()},
 		Successor: Successor{
-			TimeoutTimer: 		time.NewTimer(config.Successor_timeout),
+			SearchTimer:			time.NewTimer(config.Successor_timeout),
 		},
 		Pending: make(map[string]*network.Pending),
 		Tickers: MasterTickers{
-			Resend: 			time.NewTicker(config.Resend_rate),
-			Timeout: 			time.NewTicker(config.Timeout_check_rate),
+			Resend: 				time.NewTicker(config.Resend_rate),
+			Timeout: 				time.NewTicker(config.Timeout_check_rate),
 		},
 	}
 	return master
 }
 
 func (m *Master) NotifyNewSuccessor() {
-	for _, client := range m.ClientList {
-		if m.IP != client.Connection.GetIP() || (m.Successor.IsTimeout && m.IP == client.Connection.GetIP()) {
-			uid := utilities.GenUID("master", m.Sequence)
+	for addr, client := range m.ClientList {
+		if m.IP != client.Connection.GetIP() || (m.Successor.SearchTimedOut && m.IP == client.Connection.GetIP()) {
 			message := network.Message{
 				Header: network.Successor, 
-				UID: uid}
+				Address: addr,
+				UID: utilities.GenUID("master", m.Sequence)}
+			m.Sequence++
 			m.Successor.IsNotified = true
-			m.Pending[uid] = &network.Pending{Message: message, Timestamp: time.Now()}
+			m.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
 			client.Send(message)
 			return
 		}
 	}
 	log.Println("No suitable successor found")
-	m.Successor.TimeoutTimer.Reset(config.Successor_timeout)
+	m.Successor.SearchTimer.Reset(config.Successor_timeout)
 }
 
 func (m *Master) HandleMessage(message network.Message) {
@@ -153,7 +154,7 @@ func (m *Master) HandleMessage(message network.Message) {
 				Payload: &network.MessagePayload{BackupHall: m.Requests.Hall, BackupCab: m.Requests.Cab}, 
 				UID: message.UID})
 		} else {
-			m.SendLightUpdate()
+			m.SendButtonLightUpdate()
 		}
 
 	case network.Ack:
@@ -168,15 +169,15 @@ func (m *Master) HandleMessage(message network.Message) {
 					UID: pend.UID})
 
 			case network.OrderFulfilled:
-				m.SendLightUpdate()
+				m.SendButtonLightUpdate()
 			
 			case network.Successor:
 				if !m.HasSuccessor {
 					log.Printf("Successor found: %s", message.Address)
 					m.HasSuccessor = true
 					m.Successor.IsNotified = false
-					m.Successor.TimeoutTimer.Stop()
-					m.Successor.IsTimeout = false
+					m.Successor.SearchTimer.Stop()
+					m.Successor.SearchTimedOut = false
 					m.Successor.Address = message.Address
 					m.ClientList[m.Successor.Address].Send(network.Message{
 						Header: network.Backup, 
@@ -215,7 +216,7 @@ func (m *Master) HandleNewClient(client *network.Client) {
 		m.NotifyNewSuccessor()
 	}
 	m.ResendCabRequest(client.Addr)
-	m.SendLightUpdate()
+	m.SendButtonLightUpdate()
 }
 
 func (m *Master) HandleClientLoss(client *network.Client) {
@@ -236,7 +237,7 @@ func (m *Master) HandleClientLoss(client *network.Client) {
 		m.HasSuccessor = false
 		m.Successor.Address = ""
 		if len(m.ClientList) > 0 {
-			m.Successor.TimeoutTimer.Reset(config.Successor_timeout)
+			m.Successor.SearchTimer.Reset(config.Successor_timeout)
 			m.NotifyNewSuccessor()
 		}
 	}

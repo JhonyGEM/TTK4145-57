@@ -129,10 +129,10 @@ func main() {
 					m.HandleClientTimeout()
 					m.HandleSuccessorAckTimeout()
 
-				case <-m.Successor.TimeoutTimer.C:
-					m.Successor.TimeoutTimer.Stop()
+				case <-m.Successor.SearchTimer.C:
+					m.Successor.SearchTimer.Stop()
 					if !m.HasSuccessor {
-						m.Successor.IsTimeout = true
+						m.Successor.SearchTimedOut = true
 						m.NotifyNewSuccessor()
 					}
 				}

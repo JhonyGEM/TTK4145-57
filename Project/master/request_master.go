@@ -8,10 +8,10 @@ import (
 )
 
 func (m *Master) selectOptimalElevator(floor int) string {
-	addr := ""
+	optimalAddr := ""
 	lowestCost := 9999
 
-	for _, client := range m.ClientList {
+	for addr, client := range m.ClientList {
 		cost := utilities.Abs(client.CurrentFloor - floor) + client.ActiveRequestCount * config.Cost_penalty
 		
 		if client.Obstruction {
@@ -19,11 +19,11 @@ func (m *Master) selectOptimalElevator(floor int) string {
 		}
 
 		if cost < lowestCost {
-			addr = client.Connection.Addr
+			optimalAddr = addr
 			lowestCost = cost
 		}
 	}
-	return addr
+	return optimalAddr
 }
 
 func (m *Master) IsRequestActive(floor int, button elevio.ButtonType, addr string) bool {
@@ -56,7 +56,7 @@ func (m *Master) DistributeRequest(floor int, button elevio.ButtonType, addr str
 			}
 		}
 	}
-	m.SendLightUpdate()
+	m.SendButtonLightUpdate()
 }
 
 func (m *Master) ResetHallAssignments(id string) {
@@ -88,14 +88,14 @@ func (m *Master) ResendHallRequest() {
 	}
 }
 
-func (m *Master) SendLightUpdate() {
-	for _, elev := range m.ClientList {
+func (m *Master) SendButtonLightUpdate() {
+	for _, client := range m.ClientList {
 		light := utilities.NewRequests()
 		for f := 0; f < config.N_floors; f++ {
 			copy(light[f], m.Requests.Hall[f])
-			light[f][elevio.BT_Cab] = m.Requests.Cab[f][elev.ID]
+			light[f][elevio.BT_Cab] = m.Requests.Cab[f][client.ID]
 		}
-		elev.Send(network.Message{
+		client.Send(network.Message{
 			Header: network.LightUpdate, 
 			Payload: &network.MessagePayload{Lights: light}})
 	}
