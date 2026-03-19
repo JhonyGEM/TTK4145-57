@@ -30,9 +30,9 @@ const Msg_buf_size =        (N_floors * N_buttons) * 2
 const N_elevators = 		3
 const Cost_penalty =        3
 const Request_timeout = 	N_floors * 4 * time.Second
-const Resend_rate =         15 * time.Second
+const Resend_rate =         10 * time.Second
 const Timeout_check_rate =  1 * time.Second
-const Successor_timeout =   20 * time.Second
+const Successor_timeout =   30 * time.Second
 
 // Debugging
 const Cell_width =          8

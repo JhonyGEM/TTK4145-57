@@ -111,9 +111,9 @@ func (ns *NetworkState) ResendPendingRequest() {
 			if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
 				ns.Send(pendingMsg.Message)
 				ns.Pending[uid].Timestamp = time.Now()
-				utilities.SaveToFile(config.Pending_backup, ns.Pending)
 			}
 		}
+		utilities.SaveToFile(config.Pending_backup, ns.Pending)
 	}
 }
 
