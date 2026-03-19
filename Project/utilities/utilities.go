@@ -9,13 +9,14 @@ import (
 	"time"
 	"encoding/json"
 	"project/network"
+	"project/config"
 )
 
-func NewRequests(rows, cols int) [][]bool {
-	requests := make([][]bool, rows)
+func NewRequests() [][]bool {
+	requests := make([][]bool, config.N_floors)
 
-	for i := range requests {
-		requests[i] = make([]bool, cols)
+	for row := range requests {
+		requests[row] = make([]bool, config.N_buttons)
 	}
 
 	return requests
@@ -34,7 +35,7 @@ func StartNewInstance(id string) {
 
 func Abs(x int) int {
 	if x < 0 {
-		return - x
+		return -x
 	}
 	return x
 }

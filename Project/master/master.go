@@ -16,60 +16,72 @@ type Backup struct {
 
 func NewBackup() *Backup {
 	return &Backup{
-		HallRequests: utilities.NewRequests(config.N_floors, config.N_buttons),
-		CabRequests:  NewCabRequests(config.N_floors),
+		HallRequests: utilities.NewRequests(),
+		CabRequests:  NewCabRequests(),
 	}
 }
 
 type Master struct {
 	IP				    	string
 	ClientList 	        	map[string]*ElevatorClient		// [address]
-	HallRequests        	[][]bool						// [floor][button]
-	HallAssignments     	[][]string						// [floor][button]
-	CabRequests         	[]map[string]bool				// [floor][client id]
+	Requests                MasterRequests
 	HasSuccessor        	bool
 	Successor               Successor
 	Sequence            	int
 	Pending             	map[string]*network.Pending		// [uid]
-	ResendTicker        	*time.Ticker
-	TimeoutTicker			*time.Ticker
+	Tickers                 MasterTickers
+}
+
+type MasterRequests struct {
+	Hall					[][]bool						// [floor][button]
+	HallAssignments     	[][]string						// [floor][button]
+	Cab     		    	[]map[string]bool				// [floor][client id]
 }
 
 type Successor struct {
-	Address			string
-	Notified		bool
-	TimeoutTimer    *time.Timer
-	IsTimeout       bool	
+	Address					string
+	IsNotified				bool
+	TimeoutTimer   			*time.Timer
+	IsTimeout     			bool	
 }
 
-func NewCabRequests(floor int) []map[string]bool {
-	cabRequests := make([]map[string]bool, floor)
-	for f := 0; f < floor; f++ {
-		cabRequests[f] = make(map[string]bool)
+type MasterTickers struct {
+	Resend       			*time.Ticker
+	Timeout					*time.Ticker
+}
+
+func NewCabRequests() []map[string]bool {
+	cabRequests := make([]map[string]bool, config.N_floors)
+	for floor := 0; floor < config.N_floors; floor++ {
+		cabRequests[floor] = make(map[string]bool)
 	}
 	return cabRequests
 }
 
-func NewHallAssignments(floors, buttons int) [][]string {
-	assignments := make([][]string, floors)
-	for f := 0; f < floors; f++ {
-		assignments[f] = make([]string, buttons)
+func NewHallAssignments() [][]string {
+	assignments := make([][]string, config.N_floors)
+	for floor := 0; floor < config.N_floors; floor++ {
+		assignments[floor] = make([]string, config.N_buttons)
 	}
 	return assignments
 }
 
 func NewMaster() *Master {
 	master := &Master{
-		ClientList :      	make(map[string]*ElevatorClient),
-		HallRequests:     	utilities.NewRequests(config.N_floors, config.N_buttons),
-		HallAssignments:  	NewHallAssignments(config.N_floors, config.N_buttons),
-		CabRequests:      	NewCabRequests(config.N_floors),
-		Successor:          Successor{},
-		Pending:          	make(map[string]*network.Pending),
-		ResendTicker:     	time.NewTicker(config.Resend_rate),
-		TimeoutTicker:		time.NewTicker(config.Timeout_check_rate),
+		ClientList:	make(map[string]*ElevatorClient),
+		Requests: MasterRequests{
+			Hall: 				utilities.NewRequests(), 
+			HallAssignments: 	NewHallAssignments(), 
+			Cab: 				NewCabRequests()},
+		Successor: Successor{
+			TimeoutTimer: 		time.NewTimer(config.Successor_timeout),
+		},
+		Pending: make(map[string]*network.Pending),
+		Tickers: MasterTickers{
+			Resend: 			time.NewTicker(config.Resend_rate),
+			Timeout: 			time.NewTicker(config.Timeout_check_rate),
+		},
 	}
-	master.Successor.TimeoutTimer = time.NewTimer(config.Successor_timeout)
 	return master
 }
 
@@ -77,8 +89,10 @@ func (m *Master) NotifyNewSuccessor() {
 	for _, client := range m.ClientList {
 		if m.IP != client.Connection.GetIP() || (m.Successor.IsTimeout && m.IP == client.Connection.GetIP()) {
 			uid := utilities.GenUID("master", m.Sequence)
-			message := network.Message{Header: network.Successor, UID: uid}
-			m.Successor.Notified = true
+			message := network.Message{
+				Header: network.Successor, 
+				UID: uid}
+			m.Successor.IsNotified = true
 			m.Pending[uid] = &network.Pending{Message: message, Timestamp: time.Now()}
 			client.Send(message)
 			return
@@ -94,33 +108,35 @@ func (m *Master) HandleMessage(message network.Message) {
 		if m.HasSuccessor {
 			if !m.IsRequestActive(message.Payload.OrderFloor, message.Payload.OrderButton, message.Address) {
 				if message.Payload.OrderButton == elevio.BT_Cab {
-					m.CabRequests[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = true
+					m.Requests.Cab[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = true
 				} else {
-					m.HallRequests[message.Payload.OrderFloor][message.Payload.OrderButton] = true
+					m.Requests.Hall[message.Payload.OrderFloor][message.Payload.OrderButton] = true
 				}
 				m.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
-				m.ClientList[m.Successor.Address].Send(network.Message{Header: network.Backup, 
-																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
-																	 UID: message.UID})
+				m.ClientList[m.Successor.Address].Send(network.Message{
+					Header: network.Backup, 
+					Payload: &network.MessagePayload{BackupHall: m.Requests.Hall, BackupCab: m.Requests.Cab}, 
+					UID: message.UID})
 			} else {
 				// Repeated request -> notify elevator
-				m.ClientList[message.Address].Send(network.Message{Header: network.Ack, 
-																	UID: message.UID})
+				m.ClientList[message.Address].Send(network.Message{
+					Header: network.Ack, 
+					UID: message.UID})
 			}
 		}
 
 	case network.OrderFulfilled:
 		if message.Payload.OrderButton == elevio.BT_Cab {
-			m.CabRequests[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = false
+			m.Requests.Cab[message.Payload.OrderFloor][m.ClientList[message.Address].ID] = false
 		} else {
-			m.HallRequests[message.Payload.OrderFloor][message.Payload.OrderButton] = false
-			m.HallAssignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
+			m.Requests.Hall[message.Payload.OrderFloor][message.Payload.OrderButton] = false
+			m.Requests.HallAssignments[message.Payload.OrderFloor][message.Payload.OrderButton] = ""
 		}
-		if m.ClientList[message.Address].ActiveReq > 0 {
-			m.ClientList[message.Address].ActiveReq--
+		if m.ClientList[message.Address].ActiveRequestCount > 0 {
+			m.ClientList[message.Address].ActiveRequestCount--
 		}
 		
-		if m.ClientList[message.Address].ActiveReq > 0 {
+		if m.ClientList[message.Address].ActiveRequestCount > 0 {
 			if !m.ClientList[message.Address].Obstruction {
 				m.ClientList[message.Address].TaskTimer.Reset(config.Request_timeout)
 			}
@@ -132,9 +148,10 @@ func (m *Master) HandleMessage(message network.Message) {
 			message.UID = utilities.GenUID("master", m.Sequence)
 			m.Sequence++
 			m.Pending[message.UID] = &network.Pending{Message: message, Timestamp: time.Now()}
-			m.ClientList[m.Successor.Address].Send(network.Message{Header: network.Backup, 
-																Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
-																UID: message.UID})
+			m.ClientList[m.Successor.Address].Send(network.Message{
+				Header: network.Backup, 
+				Payload: &network.MessagePayload{BackupHall: m.Requests.Hall, BackupCab: m.Requests.Cab}, 
+				UID: message.UID})
 		} else {
 			m.SendLightUpdate()
 		}
@@ -146,8 +163,9 @@ func (m *Master) HandleMessage(message network.Message) {
 			switch pend.Header {
 			case network.OrderReceived:
 				m.DistributeRequest(pend.Payload.OrderFloor, pend.Payload.OrderButton, pend.Address)
-				m.ClientList[pend.Address].Send(network.Message{Header: network.Ack, 
-																	 UID: pend.UID})
+				m.ClientList[pend.Address].Send(network.Message{
+					Header: network.Ack, 
+					UID: pend.UID})
 
 			case network.OrderFulfilled:
 				m.SendLightUpdate()
@@ -156,20 +174,20 @@ func (m *Master) HandleMessage(message network.Message) {
 				if !m.HasSuccessor {
 					log.Printf("Successor found: %s", message.Address)
 					m.HasSuccessor = true
-					m.Successor.Notified = false
+					m.Successor.IsNotified = false
 					m.Successor.TimeoutTimer.Stop()
 					m.Successor.IsTimeout = false
 					m.Successor.Address = message.Address
-					m.ClientList[m.Successor.Address].Send(network.Message{Header: network.Backup, 
-																	 Payload: &network.MessagePayload{BackupHall: m.HallRequests, BackupCab: m.CabRequests}, 
-																	 UID: message.UID})
+					m.ClientList[m.Successor.Address].Send(network.Message{
+						Header: network.Backup, 
+						Payload: &network.MessagePayload{BackupHall: m.Requests.Hall, BackupCab: m.Requests.Cab}, 
+						UID: message.UID})
 				}
 			}
 			delete(m.Pending, pend.UID)
 		}
 
 	case network.FloorUpdate:
-		m.ClientList[message.Address].PreviousFloor = m.ClientList[message.Address].CurrentFloor
 		m.ClientList[message.Address].CurrentFloor = message.Payload.CurrentFloor
 
 	case network.ObstructionUpdate:
@@ -177,7 +195,7 @@ func (m *Master) HandleMessage(message network.Message) {
 		if message.Payload.Obstruction {
 			m.ClientList[message.Address].TaskTimer.Stop()
 		} else {
-			if m.ClientList[message.Address].ActiveReq > 0 {
+			if m.ClientList[message.Address].ActiveRequestCount > 0 {
 				m.ClientList[message.Address].TaskTimer.Reset(config.Request_timeout)
 			}
 		}
@@ -185,7 +203,6 @@ func (m *Master) HandleMessage(message network.Message) {
 	case network.ClientInfo:
 		m.ClientList[message.Address].ID = message.Payload.ID
 		m.ClientList[message.Address].CurrentFloor = message.Payload.CurrentFloor
-		m.ClientList[message.Address].PreviousFloor = message.Payload.CurrentFloor
 		m.ClientList[message.Address].Obstruction = message.Payload.Obstruction
 		m.ResendCabRequest(message.Address)
 	}
@@ -194,7 +211,7 @@ func (m *Master) HandleMessage(message network.Message) {
 func (m *Master) HandleNewClient(client *network.Client) {
 	m.AddClient(client)
 	m.ClientList[client.Addr].Send(network.Message{Header: network.NotSuccessor})
-	if !m.HasSuccessor && !m.Successor.Notified {
+	if !m.HasSuccessor && !m.Successor.IsNotified {
 		m.NotifyNewSuccessor()
 	}
 	m.ResendCabRequest(client.Addr)

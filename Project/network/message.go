@@ -34,15 +34,15 @@ type MessagePayload struct {
 }
 
 type Message struct {
-	Header  MessageType      		`json:"header"`
-	Payload *MessagePayload			`json:"payload,omitempty"`
-	Address string					`json:"address,omitempty"`
-	UID     string                  `json:"uid,omitempty"`
+	Header  MessageType      			`json:"header"`
+	Payload *MessagePayload				`json:"payload,omitempty"`
+	Address string						`json:"address,omitempty"`
+	UID     string                  	`json:"uid,omitempty"`
 }
 
 type Pending struct {
-	Timestamp time.Time				`json:"timestamp,omitempty"`
-	Message   Message				`json:"message"`
+	Timestamp time.Time					`json:"timestamp,omitempty"`
+	Message   Message					`json:"message"`
 }
 
 func (m MessageType) String() string {

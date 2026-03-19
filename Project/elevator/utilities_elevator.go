@@ -8,59 +8,60 @@ import (
 	"sync"
 )
 
-func (e *Elevator) UpdateLights(request [][]bool) {
+func (ls *LocalState) SetButtonLights() {
 	for floor := 0; floor < config.N_floors; floor++ {
-		for btn := elevio.ButtonType(0); btn < config.N_buttons; btn++ {
-			elevio.SetButtonLamp(btn, floor, request[floor][btn] || e.Requests[floor][btn])
+		for button := elevio.ButtonType(0); button < config.N_buttons; button++ {
+			elevio.SetButtonLamp(button, floor, ls.Lights[floor][button] || ls.Requests[floor][button])
 		}
 	}
 }
 
-func (e *Elevator) Send(message network.Message) {
-	if e.Connection.Conn != nil {
-		e.Connection.Send(message)
+func (ns *NetworkState) Send(message network.Message) {
+	if ns.Connection.Conn != nil {
+		ns.Connection.Send(message)
 	}
 }
 
 func (e *Elevator) ReconnectLoop(msgChan chan<- network.Message, lossChan chan<- *network.Client, quitChan chan<- struct{}, wg *sync.WaitGroup) {
 	for {
 		select {
-		case <-e.ReconnectTimer.C:
+		case <-e.Timers.Reconnect.C:
 			if network.HasInternetConnection() {
-				e.RetryCounter++
-				e.ReconnectTimer.Stop()
+				e.Network.RetryCounter++
+				e.Timers.Reconnect.Stop()
 
-				if e.RetryCounter > config.Max_retries && e.IsSuccessor {
+				if e.Network.RetryCounter > config.Max_retries && e.Network.IsSuccessor {
 					log.Println("Max retries reached, elevator becomes master")
 					close(quitChan)
 					wg.Wait()
 					elevio.Stop()
 					return
 				}
-				log.Printf("Reconnect attempt: %d \n", e.RetryCounter)
+				log.Printf("Reconnect attempt: %d \n", e.Network.RetryCounter)
 
 				addr, err := network.DiscoverServer()
 				if err != nil {
-					e.ReconnectTimer.Reset(config.Reconnect_delay)
+					e.Timers.Reconnect.Reset(config.Reconnect_delay)
 					continue
 				}
 				conn, err := network.Connect(addr)
 				if err != nil {
-					e.ReconnectTimer.Reset(config.Reconnect_delay)
+					e.Timers.Reconnect.Reset(config.Reconnect_delay)
 					continue
 				}
 
-				e.RetryCounter = 0
-				e.Connection = network.NewClient(conn)
-				e.IsConnected = true
-				e.Send(network.Message{Header: network.ClientInfo,
-					Payload: &network.MessagePayload{ID: e.ID, CurrentFloor: e.CurrentFloor, Obstruction: e.Obstruction}})
-				go e.Connection.Listen(msgChan, lossChan)
-				go e.Connection.Heartbeat()
+				e.Network.RetryCounter = 0
+				e.Network.Connection = network.NewClient(conn)
+				e.Network.IsConnected = true
+				e.Network.Send(network.Message{
+					Header: network.ClientInfo,
+					Payload: &network.MessagePayload{ID: e.Network.ID, CurrentFloor: e.Local.CurrentFloor, Obstruction: e.Local.Obstruction}})
+				go e.Network.Connection.Listen(msgChan, lossChan)
+				go e.Network.Connection.Heartbeat()
 				log.Println("Connected to server")
 			} else {
 				log.Println("No internet connection, retrying...")
-				e.ReconnectTimer.Reset(config.Reconnect_delay)
+				e.Timers.Reconnect.Reset(config.Reconnect_delay)
 			}
 		}
 	}

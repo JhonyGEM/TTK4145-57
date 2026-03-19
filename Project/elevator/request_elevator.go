@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func (e *Elevator) RequestPending() bool {
-	for f := 0; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if e.Requests[f][b] {
+func (ls *LocalState) RequestPending() bool {
+	for floor := 0; floor < config.N_floors; floor++ {
+		for button := elevio.ButtonType(0); button < config.N_buttons; button++ {
+			if ls.Requests[floor][button] {
 				return true
 			}
 		}
@@ -19,10 +19,10 @@ func (e *Elevator) RequestPending() bool {
 	return false
 }
 
-func (e *Elevator) requestAbove() bool {
-	for f := e.CurrentFloor + 1; f < config.N_floors; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if e.Requests[f][b] {
+func (ls *LocalState) requestAbove() bool {
+	for floor := ls.CurrentFloor + 1; floor < config.N_floors; floor++ {
+		for button := elevio.ButtonType(0); button < config.N_buttons; button++ {
+			if ls.Requests[floor][button] {
 				return true
 			}
 		}
@@ -30,10 +30,10 @@ func (e *Elevator) requestAbove() bool {
 	return false
 }
 
-func (e *Elevator) requestBelow() bool {
-	for f := 0; f < e.CurrentFloor; f++ {
-		for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-			if e.Requests[f][b] {
+func (ls *LocalState) requestBelow() bool {
+	for floor := 0; floor < ls.CurrentFloor; floor++ {
+		for button := elevio.ButtonType(0); button < config.N_buttons; button++ {
+			if ls.Requests[floor][button] {
 				return true
 			}
 		}
@@ -41,76 +41,77 @@ func (e *Elevator) requestBelow() bool {
 	return false
 }
 
-func (e *Elevator) requestHere() bool {
-	for b := elevio.ButtonType(0); b < config.N_buttons; b++ {
-		if e.Requests[e.CurrentFloor][b] {
+func (ls *LocalState) requestHere() bool {
+	for button := elevio.ButtonType(0); button < config.N_buttons; button++ {
+		if ls.Requests[ls.CurrentFloor][button] {
 			return true
 		}
 	}
 	return false
 }
 
-func (e *Elevator) RemoveHallRequests() {
-	for f := 0; f < config.N_floors; f++ {
-		e.Requests[f][elevio.BT_HallUp] = false
-		e.Requests[f][elevio.BT_HallDown] = false
+func (ls *LocalState) clearHallRequests() {
+	for floor := 0; floor < config.N_floors; floor++ {
+		ls.Requests[floor][elevio.BT_HallUp] = false
+		ls.Requests[floor][elevio.BT_HallDown] = false
 	}
 }
 
-func (e *Elevator) shouldStop() bool {
-	switch e.Direction {
+func (ls *LocalState) shouldStop() bool {
+	switch ls.Direction {
 	case elevio.MD_Down:
-		return e.Requests[e.CurrentFloor][elevio.BT_HallDown] || e.Requests[e.CurrentFloor][elevio.BT_Cab] || !e.requestBelow()
+		return ls.Requests[ls.CurrentFloor][elevio.BT_HallDown] || ls.Requests[ls.CurrentFloor][elevio.BT_Cab] || !ls.requestBelow()
 
 	case elevio.MD_Up:
-		return e.Requests[e.CurrentFloor][elevio.BT_HallUp] || e.Requests[e.CurrentFloor][elevio.BT_Cab] || !e.requestAbove()
+		return ls.Requests[ls.CurrentFloor][elevio.BT_HallUp] || ls.Requests[ls.CurrentFloor][elevio.BT_Cab] || !ls.requestAbove()
 
 	case elevio.MD_Stop:
-		return !e.requestBelow() && !e.requestAbove()
+		return !ls.requestBelow() && !ls.requestAbove()
 	
 	default:
 		return false
 	}
 }
 
-func (e *Elevator) shouldClear() bool {
-	return ((e.Direction == elevio.MD_Up && e.Requests[e.CurrentFloor][elevio.BT_HallUp]) ||
-		    (e.Direction == elevio.MD_Down && e.Requests[e.CurrentFloor][elevio.BT_HallDown]) ||
-		    e.Direction == elevio.MD_Stop ||
-		    e.Requests[e.CurrentFloor][elevio.BT_Cab])
+func (ls *LocalState) shouldClear() bool {
+	return ((ls.Direction == elevio.MD_Up && ls.Requests[ls.CurrentFloor][elevio.BT_HallUp]) ||
+		    (ls.Direction == elevio.MD_Down && ls.Requests[ls.CurrentFloor][elevio.BT_HallDown]) ||
+		    ls.Direction == elevio.MD_Stop ||
+		    ls.Requests[ls.CurrentFloor][elevio.BT_Cab])
 }
 
 func (e *Elevator) clearRequest(floor int, button elevio.ButtonType) {
-	if !e.Requests[floor][button] {
+	if !e.Local.Requests[floor][button] {
 		return
 	}
-	e.Requests[floor][button] = false
-	if e.IsConnected {
-		e.Send(network.Message{Header: network.OrderFulfilled, 
-							   Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
+	e.Local.Requests[floor][button] = false
+	if e.Network.IsConnected {
+		e.Network.Send(network.Message{
+			Header: network.OrderFulfilled, 
+			Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: button}})
 	}
 }
 
 func (e *Elevator) clearAtCurrentFloor() {
-	e.clearRequest(e.CurrentFloor, elevio.BT_Cab)
+	e.clearRequest(e.Local.CurrentFloor, elevio.BT_Cab)
 
-	if (e.requestAbove() && (e.Requests[e.CurrentFloor][elevio.BT_HallUp] && e.Requests[e.CurrentFloor][elevio.BT_HallDown])) {
-		e.clearRequest(e.CurrentFloor, elevio.BT_HallUp)
-	} else if (e.requestBelow() && (e.Requests[e.CurrentFloor][elevio.BT_HallUp] && e.Requests[e.CurrentFloor][elevio.BT_HallDown])) {
-		e.clearRequest(e.CurrentFloor, elevio.BT_HallDown)
+	if (e.Local.requestAbove() && (e.Local.Requests[e.Local.CurrentFloor][elevio.BT_HallUp] && e.Local.Requests[e.Local.CurrentFloor][elevio.BT_HallDown])) {
+		e.clearRequest(e.Local.CurrentFloor, elevio.BT_HallUp)
+	} else if (e.Local.requestBelow() && (e.Local.Requests[e.Local.CurrentFloor][elevio.BT_HallUp] && e.Local.Requests[e.Local.CurrentFloor][elevio.BT_HallDown])) {
+		e.clearRequest(e.Local.CurrentFloor, elevio.BT_HallDown)
 	} else {
-		e.clearRequest(e.CurrentFloor, elevio.BT_HallUp)
-		e.clearRequest(e.CurrentFloor, elevio.BT_HallDown)
+		e.clearRequest(e.Local.CurrentFloor, elevio.BT_HallUp)
+		e.clearRequest(e.Local.CurrentFloor, elevio.BT_HallDown)
 	}
 }
 
-func (e *Elevator) ResendPendingRequest() {
-	if e.IsConnected {
-		for uid, pendingMsg := range e.Pending {
+func (ns *NetworkState) ResendPendingRequest() {
+	if ns.IsConnected {
+		for uid, pendingMsg := range ns.Pending {
 			if time.Since(pendingMsg.Timestamp) > config.Pending_timeout {
-				e.Send(pendingMsg.Message)
-				e.Pending[uid].Timestamp = time.Now()
-				utilities.SaveToFile(config.Pending_backup, e.Pending)
+				ns.Send(pendingMsg.Message)
+				ns.Pending[uid].Timestamp = time.Now()
+				utilities.SaveToFile(config.Pending_backup, ns.Pending)
 			}
 		}
 	}
@@ -119,26 +120,27 @@ func (e *Elevator) ResendPendingRequest() {
 // Saves active cab requests on master promotion
 func (e *Elevator) SaveCabRequests() {
 	cabRequest := make(map[string]*network.Pending)
-	for f := 0; f < config.N_floors; f++ {
-		if e.Requests[f][elevio.BT_Cab] {
-			uid := utilities.GenUID(e.ID, e.Sequence)
-			e.Sequence++
-			cabRequest[uid] = &network.Pending{Message: network.Message{Header: network.OrderReceived, 
-																		Payload: &network.MessagePayload{OrderFloor: f, OrderButton: elevio.BT_Cab}}}
+	for floor := 0; floor < config.N_floors; floor++ {
+		if e.Local.Requests[floor][elevio.BT_Cab] {
+			uid := utilities.GenUID(e.Network.ID, e.Network.Sequence)
+			e.Network.Sequence++
+			cabRequest[uid] = &network.Pending{Message: network.Message{
+				Header: network.OrderReceived, 
+				Payload: &network.MessagePayload{OrderFloor: floor, OrderButton: elevio.BT_Cab}}}
 		}
 	}
 	utilities.SaveToFile(config.Elev_backup, cabRequest)
 }
 
-func (e *Elevator) LoadCabRequests() {
+func (ls *LocalState) LoadCabRequests() {
 	cabRequest := utilities.LoadFromFile(config.Elev_backup)
 
 	for uid, request := range cabRequest {
 		if request.Message.Header == network.OrderReceived {
-			e.Requests[request.Message.Payload.OrderFloor][request.Message.Payload.OrderButton] = true
+			ls.Requests[request.Message.Payload.OrderFloor][request.Message.Payload.OrderButton] = true
 			delete(cabRequest, uid)
 		}
 	}
-	e.UpdateLights(e.Requests)
+	ls.SetButtonLights()
 	utilities.SaveToFile(config.Elev_backup, cabRequest)
 }

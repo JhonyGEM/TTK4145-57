@@ -6,19 +6,19 @@ import (
 )
 
 func (e *Elevator) StepFSM() {
-	switch e.CurrentState {
+	switch e.Local.State {
 	case Undefined:
-		e.UpdateLights(e.Lights)
-		e.Obstruction = elevio.GetObstruction()
+		e.Local.SetButtonLights()
+		e.Local.Obstruction = elevio.GetObstruction()
 		elevio.SetDoorOpenLamp(false)
 
 		if elevio.GetFloor() == -1 {
-			e.updateDirection(elevio.MD_Down)
+			e.Local.updateDirection(elevio.MD_Down)
 		} else {
-			e.CurrentFloor = elevio.GetFloor()
-			elevio.SetFloorIndicator(e.CurrentFloor)
-			e.updateDirection(elevio.MD_Stop)
-			if e.Obstruction {
+			e.Local.CurrentFloor = elevio.GetFloor()
+			elevio.SetFloorIndicator(e.Local.CurrentFloor)
+			e.Local.updateDirection(elevio.MD_Stop)
+			if e.Local.Obstruction {
 				e.UpdateState(DoorOpen)
 			} else {
 				e.UpdateState(Idle)
@@ -26,11 +26,11 @@ func (e *Elevator) StepFSM() {
 		}
 
 	case Idle:
-		if e.RequestPending() {
-			if e.requestHere() {
+		if e.Local.RequestPending() {
+			if e.Local.requestHere() {
 				e.clearAtCurrentFloor()
-				e.UpdateLights(e.Lights)
-				e.DoorTimer.Reset(config.Open_duration)
+				e.Local.SetButtonLights()
+				e.Timers.Door.Reset(config.Open_duration)
 				e.UpdateState(DoorOpen)
 			} else {
 				e.UpdateState(Moving)
@@ -38,29 +38,29 @@ func (e *Elevator) StepFSM() {
 		}
 
 	case Moving:
-		if (e.shouldStop() && elevio.GetFloor() != -1) {
-			e.updateDirection(elevio.MD_Stop)
-			if e.shouldClear() {
+		if (e.Local.shouldStop() && elevio.GetFloor() != -1) {
+			e.Local.updateDirection(elevio.MD_Stop)
+			if e.Local.shouldClear() {
 				e.clearAtCurrentFloor()
-				e.UpdateLights(e.Lights)
+				e.Local.SetButtonLights()
 			}
-			e.DoorTimer.Reset(config.Open_duration)	
+			e.Timers.Door.Reset(config.Open_duration)	
 			e.UpdateState(DoorOpen)
 		} else {
-			e.chooseDirection()
+			e.Local.chooseDirection()
 		}
 
 	case DoorOpen:
 		elevio.SetDoorOpenLamp(true)
 
-		if e.Obstruction {
-			e.DoorTimer.Reset(config.Open_duration)
-			e.DoorTimerDone = false
+		if e.Local.Obstruction {
+			e.Timers.Door.Reset(config.Open_duration)
+			e.Local.DoorTimerDone = false
 		} else {
-			if e.DoorTimerDone {
+			if e.Local.DoorTimerDone {
 				elevio.SetDoorOpenLamp(false)
-				e.DoorTimerDone = false
-				if e.RequestPending() {
+				e.Local.DoorTimerDone = false
+				if e.Local.RequestPending() {
 					e.UpdateState(Moving)
 				} else {
 					e.UpdateState(Idle)
@@ -71,45 +71,45 @@ func (e *Elevator) StepFSM() {
 }
 
 func (e *Elevator) UpdateState(newState ElevatorState) {
-	e.CurrentState = newState
+	e.Local.State = newState
 	e.StepFSM()
 }
 
-func (e *Elevator) updateDirection(newDirection elevio.MotorDirection) {
-	e.Direction = newDirection
+func (ls *LocalState) updateDirection(newDirection elevio.MotorDirection) {
+	ls.Direction = newDirection
 	elevio.SetMotorDirection(newDirection)
 }
 
-func (e *Elevator) chooseDirection() {
-	switch e.Direction {
+func (ls *LocalState) chooseDirection() {
+	switch ls.Direction {
 	case elevio.MD_Up:
-		if e.requestAbove() {
-			e.Direction = elevio.MD_Up
-		} else if e.requestBelow() {
-			e.Direction = elevio.MD_Down
+		if ls.requestAbove() {
+			ls.Direction = elevio.MD_Up
+		} else if ls.requestBelow() {
+			ls.Direction = elevio.MD_Down
 		} else {
-			e.Direction = elevio.MD_Stop
+			ls.Direction = elevio.MD_Stop
 		}
-		elevio.SetMotorDirection(e.Direction)
+		elevio.SetMotorDirection(ls.Direction)
 	
 	case elevio.MD_Down:
-		if e.requestBelow() {
-			e.Direction = elevio.MD_Down
-		} else if e.requestAbove() {
-			e.Direction = elevio.MD_Up
+		if ls.requestBelow() {
+			ls.Direction = elevio.MD_Down
+		} else if ls.requestAbove() {
+			ls.Direction = elevio.MD_Up
 		} else {
-			e.Direction = elevio.MD_Stop
+			ls.Direction = elevio.MD_Stop
 		}
-		elevio.SetMotorDirection(e.Direction)
+		elevio.SetMotorDirection(ls.Direction)
 
 	case elevio.MD_Stop:
-		if e.requestAbove() {
-			e.Direction = elevio.MD_Up
-		} else if e.requestBelow() {
-			e.Direction = elevio.MD_Down
+		if ls.requestAbove() {
+			ls.Direction = elevio.MD_Up
+		} else if ls.requestBelow() {
+			ls.Direction = elevio.MD_Down
 		} else {
-			e.Direction = elevio.MD_Stop
+			ls.Direction = elevio.MD_Stop
 		}
-		elevio.SetMotorDirection(e.Direction)
+		elevio.SetMotorDirection(ls.Direction)
 	}
 }

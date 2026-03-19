@@ -8,13 +8,12 @@ import (
 )
 
 type ElevatorClient struct {
-	Connection 		*network.Client
-	ID 				string
-	CurrentFloor 	int
-	PreviousFloor   int
-	Obstruction 	bool
-	ActiveReq       int
-	TaskTimer 		*time.Timer
+	Connection 			*network.Client
+	ID 					string
+	CurrentFloor 		int
+	Obstruction 		bool
+	ActiveRequestCount  int
+	TaskTimer 			*time.Timer
 }
 
 func (ec *ElevatorClient) Send(message network.Message) {
@@ -63,7 +62,7 @@ func (m *Master) HandleSuccessorAckTimeout() {
 	for uid, pend := range m.Pending {
 		if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
 			if !m.HasSuccessor {
-				m.Successor.Notified = false
+				m.Successor.IsNotified = false
 				m.NotifyNewSuccessor()
 			}
 			delete(m.Pending, uid)

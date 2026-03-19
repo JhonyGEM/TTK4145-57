@@ -11,12 +11,12 @@ import (
 )
 
 type Client struct {
-    Conn   *net.TCPConn
-    Reader *bufio.Reader
-	Writer *bufio.Writer
-    Addr   string
-	Activity chan struct{}
-	Stop   chan struct{}
+    Conn   		*net.TCPConn
+    Reader 		*bufio.Reader
+	Writer 		*bufio.Writer
+    Addr   		string
+	Activity 	chan struct{}
+	Stop   		chan struct{}
 }
 
 func StartServer(lossChan chan<- *Client, newChan chan<- *Client, msgChan chan<- Message) {

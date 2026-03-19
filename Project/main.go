@@ -55,8 +55,8 @@ func main() {
 			go elevio.PollObstructionSwitch(obstructionChan, quitChan, &wg)
 			go e.ReconnectLoop(messageChan, lostChan, quitChan, &wg)
 
-			e.Pending = utilities.LoadFromFile(config.Pending_backup)
-			e.LoadCabRequests()
+			e.Network.Pending = utilities.LoadFromFile(config.Pending_backup)
+			e.Local.LoadCabRequests()
 			e.StepFSM()
 
 			for role == RoleElevator {
@@ -73,9 +73,9 @@ func main() {
 				case obstruction := <-obstructionChan:
 					e.HandleObstructionUpdate(obstruction)
 
-				case <-e.DoorTimer.C:
-					e.DoorTimer.Stop()
-					e.DoorTimerDone = true
+				case <-e.Timers.Door.C:
+					e.Timers.Door.Stop()
+					e.Local.DoorTimerDone = true
 					e.StepFSM()
 
 				case <-lostChan:
@@ -87,11 +87,11 @@ func main() {
 				case <-quitChan:
 					e.SaveCabRequests()
 					role = RoleMaster
-					utilities.StartNewInstance(e.ID)
+					utilities.StartNewInstance(e.Network.ID)
 					continue
 
-				case <-e.PendingTicker.C:
-					e.ResendPendingRequest()
+				case <-e.Timers.PendingTicker.C:
+					e.Network.ResendPendingRequest()
 				}
 			}
 
@@ -99,33 +99,33 @@ func main() {
 			log.Println("Starting master")
 
 			m := master.NewMaster()
-			m.CabRequests = b.CabRequests
-			m.HallRequests = b.HallRequests
+			m.Requests.Cab = b.CabRequests
+			m.Requests.Hall = b.HallRequests
 			m.IP = network.GetLocalIP()
 
-			newChan := make(chan *network.Client, config.N_elevators)
-			lostChan := make(chan *network.Client, config.N_elevators)
+			newClientChan := make(chan *network.Client, config.N_elevators)
+			lostClientChan := make(chan *network.Client, config.N_elevators)
 			messageChan := make(chan network.Message, config.Msg_buf_size)
 
-			go network.StartServer(lostChan, newChan, messageChan)
+			go network.StartServer(lostClientChan, newClientChan, messageChan)
 
 			for {
 				select {
-				case new := <-newChan:
+				case new := <-newClientChan:
 					m.HandleNewClient(new)
 
-				case lost := <-lostChan:
+				case lost := <-lostClientChan:
 					m.HandleClientLoss(lost)
 
 				case message := <-messageChan:
 					m.HandleMessage(message)
 
-				case <-m.ResendTicker.C:
+				case <-m.Tickers.Resend.C:
 					if m.HasSuccessor {
 						m.ResendHallRequest()
 					}
 
-				case <-m.TimeoutTicker.C:
+				case <-m.Tickers.Timeout.C:
 					m.HandleClientTimeout()
 					m.HandleSuccessorAckTimeout()
 

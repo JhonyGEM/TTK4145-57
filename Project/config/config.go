@@ -8,8 +8,8 @@ import (
 const N_floors =			4
 const N_buttons =			3
 const Open_duration =		3 * time.Second
-const Elev_backup =     	"elevator_backup.json"
 const Btn_buf_size =		N_floors * N_buttons
+const Elev_backup =     	"elevator_backup.json"
 const Pending_backup =      "pending_backup.json"
 const Pending_timeout =     15 * time.Second
 const Pending_check_rate =  1 * time.Second
