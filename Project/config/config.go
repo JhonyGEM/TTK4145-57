@@ -32,7 +32,7 @@ const Cost_penalty =        3
 const Request_timeout = 	N_floors * 4 * time.Second
 const Resend_rate =         10 * time.Second
 const Timeout_check_rate =  1 * time.Second
-const Successor_timeout =   30 * time.Second
+const Search_rate = 		30 * time.Second
 
 // Debugging
 const Cell_width =          8

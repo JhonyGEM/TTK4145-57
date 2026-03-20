@@ -40,7 +40,7 @@ func (m *Master) RemoveClient(addr string) {
 	}
 }
 
-func (m *Master) HandleClientTimeout() {
+func (m *Master) MonitorClientTasksTimers() {
 	for addr, client := range m.ClientList {
 		if client.TaskTimer == nil {
 			continue
@@ -58,7 +58,7 @@ func (m *Master) HandleClientTimeout() {
 	}
 }
 
-func (m *Master) HandleSuccessorAckTimeout() {
+func (m *Master) MonitorSuccessorAck() {
 	for uid, pend := range m.Pending {
 		if pend.Message.Header == network.Successor && time.Since(pend.Timestamp) > config.Pending_timeout {
 			if !m.HasSuccessor {
@@ -67,7 +67,7 @@ func (m *Master) HandleSuccessorAckTimeout() {
 					client.Send(network.Message{Header: network.NotSuccessor})
 				}
 				m.Successor.IsNotified = false
-				m.Successor.SearchTimer.Reset(config.Successor_timeout)
+				m.Successor.SearchTimer.Reset(config.Search_rate)
 				m.NotifyNewSuccessor()
 			}
 			delete(m.Pending, uid)

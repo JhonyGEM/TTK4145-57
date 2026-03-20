@@ -47,7 +47,7 @@ type Successor struct {
 
 type MasterTickers struct {
 	Resend       			*time.Ticker
-	Timeout					*time.Ticker
+	TimeoutCheck			*time.Ticker
 }
 
 func NewCabRequests() []map[string]bool {
@@ -74,12 +74,12 @@ func NewMaster() *Master {
 			HallAssignments: 		NewHallAssignments(), 
 			Cab: 					NewCabRequests()},
 		Successor: Successor{
-			SearchTimer:			time.NewTimer(config.Successor_timeout),
+			SearchTimer:			time.NewTimer(config.Search_rate),
 		},
 		Pending: make(map[string]*network.Pending),
 		Tickers: MasterTickers{
 			Resend: 				time.NewTicker(config.Resend_rate),
-			Timeout: 				time.NewTicker(config.Timeout_check_rate),
+			TimeoutCheck: 			time.NewTicker(config.Timeout_check_rate),
 		},
 	}
 	return master
@@ -100,7 +100,7 @@ func (m *Master) NotifyNewSuccessor() {
 		}
 	}
 	log.Println("No suitable successor found")
-	m.Successor.SearchTimer.Reset(config.Successor_timeout)
+	m.Successor.SearchTimer.Reset(config.Search_rate)
 }
 
 func (m *Master) HandleMessage(message network.Message) {
@@ -237,7 +237,7 @@ func (m *Master) HandleClientLoss(client *network.Client) {
 		m.HasSuccessor = false
 		m.Successor.Address = ""
 		if len(m.ClientList) > 0 {
-			m.Successor.SearchTimer.Reset(config.Successor_timeout)
+			m.Successor.SearchTimer.Reset(config.Search_rate)
 			m.NotifyNewSuccessor()
 		}
 	}

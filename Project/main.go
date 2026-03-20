@@ -45,7 +45,7 @@ func main() {
 			floorChan := make(chan int)
 			obstructionChan := make(chan bool)
 
-			lostChan := make(chan *network.Client)
+			disconnectChan := make(chan *network.Client)
 			messageChan := make(chan network.Message, config.Msg_buf_size)
 			quitChan := make(chan struct{})
 
@@ -53,7 +53,7 @@ func main() {
 			go elevio.PollButtons(buttonChan, quitChan, &wg)
 			go elevio.PollFloorSensor(floorChan, quitChan, &wg)
 			go elevio.PollObstructionSwitch(obstructionChan, quitChan, &wg)
-			go e.ReconnectLoop(messageChan, lostChan, quitChan, &wg)
+			go e.ReconnectLoop(messageChan, disconnectChan, quitChan, &wg)
 
 			e.Network.Pending = utilities.LoadFromFile(config.Pending_backup)
 			e.Local.LoadCabRequests()
@@ -78,7 +78,7 @@ func main() {
 					e.Local.DoorTimerDone = true
 					e.StepFSM()
 
-				case <-lostChan:
+				case <-disconnectChan:
 					e.HandleDisconnect()
 
 				case message := <-messageChan:
@@ -125,9 +125,9 @@ func main() {
 						m.ResendHallRequest()
 					}
 
-				case <-m.Tickers.Timeout.C:
-					m.HandleClientTimeout()
-					m.HandleSuccessorAckTimeout()
+				case <-m.Tickers.TimeoutCheck.C:
+					m.MonitorClientTasksTimers()
+					m.MonitorSuccessorAck()
 
 				case <-m.Successor.SearchTimer.C:
 					m.Successor.SearchTimer.Stop()
