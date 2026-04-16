@@ -255,17 +255,30 @@ The problem is that there is no way to prioritize the cases, as Go will [choose 
 
 - Condition variables, Java monitors, and Ada protected objects are quite similar in what they do (temporarily yield execution so some other task can unblock us).
   - But in what ways do these mechanisms differ?
-
+    Condition variables are more primitive, while Java monitors are more integrated as you have to explicitly use them but in Ada is built-in the object especification.
+    
 - Bugs in this kind of low-level synchronization can be hard to spot.
   - Which solutions are you most confident are correct?
+      Ada
   - Why, and what does this say about code quality?
+      Probably beacause the syntax of Ada if higher and offers a more intuitive way of coding
 
 - We operated only with two priority levels here, but it makes sense for this "kind" of priority resource to support more priorities.
   - How would you extend these solutions to N priorities? Is it even possible to do this elegantly?
+    In Ada is harder as you need more entries for each case. 
+    In Go would be similar to Ada, as we would need more nested select statements
+    In D would be simpler as you only need to expand the size of the array
+      The semaphres would require more if statemtens, but i would be cleaner that the other options
   - What (if anything) does that say about code quality?
+    Sempahores and conditional variables are harder to read and therefore understanding. Small problems are hard to detect. While in Ada and Go, as they are higher level languages, it easier to spot bugs as they offer a better readibility
 
 - In D's standard library, `getValue` for semaphores is not even exposed (probably because it is not portable – Windows semaphores don't have `getValue`, though you could hack it together with `ReleaseSemaphore()` and `WaitForSingleObject()`).
   - A leading question: Is using `getValue` *ever* appropriate?
+      No, because whne using getValue we would get a snapshot value
   - Explain your intuition: What is it that makes `getValue` so dubious?
+      Because it gives a correct value, but that value may be outdated.
 
 - Which one(s) of these different mechanisms do you prefer, both for this specific task and in general? (This is a matter of taste – there are no "right" answers here)
+
+Ada and GO because they are easier to understand however they may not be appropiate for escaliting. Meanwhile D offer a more low-level centered and simple way.
+
