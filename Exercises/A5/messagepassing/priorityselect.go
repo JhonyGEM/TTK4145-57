@@ -41,12 +41,16 @@ func resourceManager(takeLow chan Resource, takeHigh chan Resource, giveBack cha
     
     for {
         select {
+        // To prioritize the high priority requests
         case takeHigh<- res:
-            //fmt.Printf("[resource manager]: resource taken (high)\n")
-        case takeLow<- res:
-            //fmt.Printf("[resource manager]: resource taken (low)\n")
-        case res = <-giveBack:
-            //fmt.Printf("[resource manager]: resource returned\n")
+            res = <-giveBack //Block the resource until current user is done
+        default:
+            select {
+            case takeHigh<- res:
+                res = <-giveBack
+            case takeLow<- res:
+                res = <-giveBack
+            }
         }
     }
 }

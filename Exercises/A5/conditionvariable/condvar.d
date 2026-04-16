@@ -40,11 +40,21 @@ class Resource(T) {
     }
     
     T allocate(int id, int priority){
+        mtx.lock();
+        queue.insert(id, priority);
+        while(queue.front() != id) {
+            cond.wait();    //Pause the thread and drops the lock, waits for the wake up
+        }
+        mtx.unlock();
         return value;
     }
     
     void deallocate(T v){
+        mtx.lock();
         value = v;
+        queue.popFront();
+        cond.notifyAll();   // Wake up the thread
+        mtx.unlock();
     }
 }
 

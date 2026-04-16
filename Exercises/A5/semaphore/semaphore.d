@@ -33,11 +33,32 @@ class Resource(T) {
     }
     
     T allocate(int priority){
+        mtx.wait(); //Locks the mutex to prevent data race
+        if (busy) {
+            numWaiting[priority]++;  //Increas the counter of threads waiting for that resource
+            mtx.notify(); //Unlocks the mutex
+            sems[priority].wait(); //Pause the thread, wait for wake up
+        } else {
+            busy = true;
+            mtx.notify();
+        }
         return value;
     }
     
     void deallocate(T v){
-        value = v;
+        mtx.wait(); //Locks the mutex
+        value = v; //Updates the value
+        if (numWaiting[1] > 0) {
+            numWaiting[1]--; //Decrease the counter of threads waiting for that resource
+            // We keep busy true to ensure the resource stays locked during the transfer from the old to the new thread
+            sems[1].notify(); // Wake up the thread
+        } else if (numWaiting[0] > 0) {
+            numWaiting[0]--;
+            sems[0].notify();
+        } else {
+            busy = false;
+        }
+        mtx.notify(); //Unlocks the mutex
     }
 }
 
